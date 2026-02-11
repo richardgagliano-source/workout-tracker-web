@@ -409,7 +409,7 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
   );
   params.set("workout_exercises.exercise_id", `in.(${idsStr})`);
   params.set("workout_exercises.workouts.user_id", `eq.${userId}`);
-  params.set("order", "workout_exercises.workouts.performed_at.desc,set_index.asc");
+  params.set("order", "set_index.asc,workout_exercises(workouts(performed_at.desc))");
   params.set("limit", "500");
 
   const rows = await fetchJSON(`/rest/v1/sets?${params.toString()}`) || [];
