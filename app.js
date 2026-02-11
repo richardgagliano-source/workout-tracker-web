@@ -664,30 +664,32 @@ async function loadHistory(userId) {
 
 async function refreshHistory() {
   const host = $("historyList");
+  const detail = $("historyDetail");
+
+  // Always reset to list view when refreshing
+  detail.classList.add("hidden");
+  detail.innerHTML = "";
+  host.classList.remove("hidden");
+
   host.innerHTML = "Loading...";
+  const rows = await loadHistory();
+  host.innerHTML = "";
 
-  let userId;
-  try { userId = getUserIdOrThrow(); }
-  catch { host.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
+  rows.forEach((w) => {
+    const card = document.createElement("div");
+    card.className = "item";
 
-  try {
-    const rows = await loadHistory(userId);
-    host.innerHTML = "";
-    if (!rows.length) {
-      host.innerHTML = `<div class="muted">No workouts yet. Start one in the Workout tab.</div>`;
-      return;
-    }
-    rows.forEach((w) => {
-      const card = document.createElement("div");
-      card.className = "item";
-      const dt = new Date(w.performed_at).toLocaleString();
-      card.innerHTML = `<h3>${dt}</h3><div class="small">${w.exercise_count} exercises</div>`;
-      host.appendChild(card);
-    });
-  } catch (err) {
-    console.error(err);
-    host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
-  }
+    const dt = new Date(w.performed_at).toLocaleString();
+    const exCount = (w.workout_exercises || []).length;
+
+    card.innerHTML = `<h3>${dt}</h3><div class="small">${exCount} exercises</div>`;
+
+    // ✅ click to open detail
+    card.style.cursor = "pointer";
+    card.addEventListener("click", () => showWorkoutDetail(w.id));
+
+    host.appendChild(card);
+  });
 }
 function fmtSet(s) {
   const w = s.weight == null ? "—" : s.weight;
