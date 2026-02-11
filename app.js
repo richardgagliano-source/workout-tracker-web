@@ -666,29 +666,50 @@ async function refreshHistory() {
   const host = $("historyList");
   const detail = $("historyDetail");
 
-  // Always reset to list view when refreshing
+  // reset to list view
   detail.classList.add("hidden");
   detail.innerHTML = "";
   host.classList.remove("hidden");
 
   host.innerHTML = "Loading...";
-  const rows = await loadHistory();
-  host.innerHTML = "";
 
-  rows.forEach((w) => {
-    const card = document.createElement("div");
-    card.className = "item";
+  let userId;
+  try {
+    userId = getUserIdOrThrow();
+  } catch {
+    host.innerHTML = '<div class="muted">Not signed in.</div>';
+    return;
+  }
 
-    const dt = new Date(w.performed_at).toLocaleString();
-    const exCount = (w.workout_exercises || []).length;
+  try {
+    const rows = await loadHistory(userId);
+    host.innerHTML = "";
 
-    card.innerHTML = `<h3>${dt}</h3><div class="small">${exCount} exercises</div>`;
+    if (!rows.length) {
+      host.innerHTML = '<div class="muted">No workouts yet. Start one in the Workout tab.</div>';
+      return;
+    }
 
-    // ✅ click to open detail
-    card.style.cursor = "pointer";
-    card.addEventListener("click", () => showWorkoutDetail(w.id));
+    rows.forEach((w) => {
+      const card = document.createElement("div");
+      card.className = "item";
+      card.style.cursor = "pointer";
 
-    host.appendChild(card);
+      const dt = new Date(w.performed_at).toLocaleString();
+      const exCount = w.exercise_count ?? 0;
+
+      card.innerHTML = `<h3>${dt}</h3><div class="small">${exCount} exercises</div>`;
+
+      // ✅ CLICK HANDLER
+      card.addEventListener("click", () => showWorkoutDetail(w.id));
+
+      host.appendChild(card);
+    });
+  } catch (err) {
+    console.error(err);
+    host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
+  }
+}
   });
 }
 function fmtSet(s) {
