@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Expose for debugging in DevTools Console
+// Expose for debugging
 window.sb = sb;
 console.log("sb ready", !!window.sb);
 
@@ -18,7 +18,7 @@ const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
 
-let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseName, sets: [...] }] }
+let activeWorkout = null;
 
 // --- Tabs ---
 document.querySelectorAll(".tab").forEach((btn) => {
@@ -26,7 +26,7 @@ document.querySelectorAll(".tab").forEach((btn) => {
     document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     const tab = btn.dataset.tab;
-    ["templates", "workout", "library", "history"].forEach((t) => hide($(`tab-${t}`)));
+    ["templates","workout","library","history"].forEach((t) => hide($(`tab-${t}`)));
     show($(`tab-${tab}`));
   });
 });
@@ -34,17 +34,19 @@ document.querySelectorAll(".tab").forEach((btn) => {
 // --- Auth ---
 $("signInBtn").addEventListener("click", async () => {
   setAuthMsg("");
-  const email = $("email").value.trim();
-  const password = $("password").value;
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+  const { error } = await sb.auth.signInWithPassword({
+    email: $("email").value.trim(),
+    password: $("password").value
+  });
   if (error) setAuthMsg(error.message);
 });
 
 $("signUpBtn").addEventListener("click", async () => {
   setAuthMsg("");
-  const email = $("email").value.trim();
-  const password = $("password").value;
-  const { error } = await sb.auth.signUp({ email, password });
+  const { error } = await sb.auth.signUp({
+    email: $("email").value.trim(),
+    password: $("password").value
+  });
   if (error) setAuthMsg(error.message);
   else setAuthMsg("Signed up! Now sign in.");
 });
@@ -72,15 +74,13 @@ function renderUserBar(user) {
 
 // --- Data fetchers ---
 async function loadExercises(search = "") {
-  let q = sb
-    .from("exercises")
+  let q = sb.from("exercises")
     .select("id,name,primary_muscle,equipment,is_system,owner_user_id")
     .order("name", { ascending: true });
 
   if (search.trim()) q = q.ilike("name", `%${search.trim()}%`);
 
   const { data, error } = await q;
-
   if (error) {
     console.error("Supabase exercises error:", error);
     throw error;
@@ -119,7 +119,9 @@ $("createTplBtn").addEventListener("click", async () => {
   const userId = userRes.user?.id;
   if (!userId) return;
 
-  const { error } = await sb.from("workout_templates").insert({ user_id: userId, name, split_type });
+  const { error } = await sb.from("workout_templates")
+    .insert({ user_id: userId, name, split_type });
+
   if (error) alert(error.message);
 
   $("tplName").value = "";
@@ -131,9 +133,9 @@ async function refreshTemplates() {
   list.innerHTML = "Loading...";
   const templates = await loadTemplates();
 
-  // for Start Workout dropdown
   const sel = $("startTplSelect");
   sel.innerHTML = "";
+
   templates.forEach((t) => {
     const opt = document.createElement("option");
     opt.value = t.id;
@@ -142,19 +144,21 @@ async function refreshTemplates() {
   });
 
   list.innerHTML = "";
+
   for (const t of templates) {
     const card = document.createElement("div");
     card.className = "item";
 
     const h = document.createElement("h3");
     h.textContent = t.name;
+
     const pill = document.createElement("span");
     pill.className = "pill";
     pill.textContent = t.split_type;
     h.appendChild(pill);
 
     const current = (t.workout_template_exercises || [])
-      .sort((a, b) => a.order_index - b.order_index)
+      .sort((a,b) => a.order_index - b.order_index)
       .map((x) => x.exercises?.name)
       .filter(Boolean);
 
@@ -171,101 +175,43 @@ async function refreshTemplates() {
       ul.appendChild(row);
     });
 
-    const search = document.createElement("input");
-    search.placeholder = "Search exercises to add...";
-
-    const results = document.createElement("div");
-    results.className = "stack";
-
-    search.addEventListener("input", async () => {
-      const term = search.value.trim();
-      results.innerHTML = "";
-      if (term.length < 2) return;
-
-      const ex = await loadExercises(term);
-      ex.slice(0, 10).forEach((e) => {
-        const b = document.createElement("button");
-        b.className = "secondary";
-        b.textContent = `Add: ${e.name}`;
-        b.onclick = async () => {
-          const existingCount = current.length;
-          if (existingCount >= 5) {
-            alert("This template already has 5 exercises.");
-            return;
-          }
-          const { error } = await sb.from("workout_template_exercises").insert({
-            template_id: t.id,
-            exercise_id: e.id,
-            order_index: existingCount
-          });
-          if (error) alert(error.message);
-          await refreshTemplates();
-        };
-        results.appendChild(b);
-      });
-    });
-
-    const delBtn = document.createElement("button");
-    delBtn.className = "secondary";
-    delBtn.textContent = "Delete template";
-    delBtn.onclick = async () => {
-      if (!confirm("Delete this template?")) return;
-      const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
-      if (error) alert(error.message);
-      await refreshTemplates();
-    };
-
-    card.append(h, p, ul, search, results, delBtn);
+    card.append(h, p, ul);
     list.appendChild(card);
   }
 }
 
-// --- Workout: start from template ---
+// --- Workout ---
 $("startWorkoutBtn").addEventListener("click", async () => {
   setWorkoutMsg("");
   const templateId = $("startTplSelect").value;
   if (!templateId) return;
 
-  const { data: tex, error: texErr } = await sb
+  const { data: tex } = await sb
     .from("workout_template_exercises")
-    .select("exercise_id, order_index, exercises(id,name)")
+    .select("exercise_id, order_index, exercises(name)")
     .eq("template_id", templateId)
-    .order("order_index", { ascending: true });
+    .order("order_index");
 
-  if (texErr) return alert(texErr.message);
-  if (!tex || tex.length !== 5) return alert("Template must have exactly 5 exercises.");
+  if (!tex || tex.length !== 5) {
+    alert("Template must have exactly 5 exercises.");
+    return;
+  }
 
   const { data: userRes } = await sb.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) return;
 
-  const { data: workout, error: wErr } = await sb
+  const { data: workout } = await sb
     .from("workouts")
     .insert({ user_id: userId, performed_at: new Date().toISOString() })
     .select("id")
     .single();
 
-  if (wErr) return alert(wErr.message);
-
-  const weRows = tex.map((row) => ({
-    workout_id: workout.id,
-    exercise_id: row.exercise_id,
-    order_index: row.order_index
-  }));
-
-  const { data: weInserted, error: weErr } = await sb
-    .from("workout_exercises")
-    .insert(weRows)
-    .select("id, order_index, exercises(name)")
-    .order("order_index", { ascending: true });
-
-  if (weErr) return alert(weErr.message);
-
   activeWorkout = {
     workoutId: workout.id,
-    items: (weInserted || []).map((we) => ({
-      workoutExerciseId: we.id,
-      exerciseName: we.exercises?.name || "Exercise",
+    items: tex.map((row) => ({
+      workoutExerciseId: null,
+      exerciseName: row.exercises?.name || "Exercise",
       sets: [{ set_index: 0, weight: "", reps: "" }]
     }))
   };
@@ -290,81 +236,30 @@ function renderActiveWorkout() {
     const setsBox = document.createElement("div");
     setsBox.className = "stack";
 
-    function renderSets() {
-      setsBox.innerHTML = "";
-      item.sets.forEach((s, si) => {
-        const row = document.createElement("div");
-        row.className = "row";
+    item.sets.forEach((s, si) => {
+      const row = document.createElement("div");
+      row.className = "row";
 
-        const w = document.createElement("input");
-        w.placeholder = "weight";
-        w.inputMode = "decimal";
-        w.value = s.weight;
-        w.oninput = () => (s.weight = w.value);
+      const w = document.createElement("input");
+      w.placeholder = "weight";
+      w.value = s.weight;
+      w.oninput = () => s.weight = w.value;
 
-        const r = document.createElement("input");
-        r.placeholder = "reps";
-        r.inputMode = "numeric";
-        r.value = s.reps;
-        r.oninput = () => (s.reps = r.value);
+      const r = document.createElement("input");
+      r.placeholder = "reps";
+      r.value = s.reps;
+      r.oninput = () => s.reps = r.value;
 
-        const del = document.createElement("button");
-        del.className = "secondary";
-        del.textContent = "Remove";
-        del.onclick = () => {
-          item.sets = item.sets
-            .filter((_, j) => j !== si)
-            .map((x, j) => ({ ...x, set_index: j }));
-          renderSets();
-        };
+      row.append(w, r);
+      setsBox.appendChild(row);
+    });
 
-        row.append(w, r, del);
-        setsBox.appendChild(row);
-      });
-    }
-
-    const addSet = document.createElement("button");
-    addSet.className = "secondary";
-    addSet.textContent = "Add set";
-    addSet.onclick = () => {
-      item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
-      renderSets();
-    };
-
-    renderSets();
-    card.append(h, setsBox, addSet);
+    card.append(h, setsBox);
     host.appendChild(card);
   });
 }
 
-$("saveWorkoutBtn").addEventListener("click", async () => {
-  if (!activeWorkout) return;
-
-  for (const item of activeWorkout.items) {
-    const rows = item.sets
-      .filter((s) => String(s.weight).trim() !== "" || String(s.reps).trim() !== "")
-      .map((s) => ({
-        workout_exercise_id: item.workoutExerciseId,
-        set_index: s.set_index,
-        weight: String(s.weight).trim() === "" ? null : Number(s.weight),
-        reps: String(s.reps).trim() === "" ? null : Number(s.reps),
-        is_warmup: false
-      }));
-
-    if (rows.length) {
-      const { error } = await sb.from("sets").insert(rows);
-      if (error) return alert(error.message);
-    }
-  }
-
-  setWorkoutMsg("Saved ✅");
-  activeWorkout = null;
-  $("activeWorkout").innerHTML = "";
-  hide($("saveWorkoutBtn"));
-  await refreshHistory();
-});
-
-// --- Library UI (with error handling) ---
+// --- Library ---
 $("exerciseSearch").addEventListener("input", async () => {
   try {
     const term = $("exerciseSearch").value.trim();
@@ -384,13 +279,15 @@ $("exerciseSearch").addEventListener("input", async () => {
     if (ex.length === 0) {
       list.innerHTML = `<div class="muted">No exercises found.</div>`;
     }
+
   } catch (err) {
     console.error("Library failed:", err);
-    $("exerciseList").innerHTML = `<div class="muted">Error loading exercises. Check console.</div>`;
+    $("exerciseList").innerHTML =
+      `<div class="muted">Error loading exercises. Check console.</div>`;
   }
 });
 
-// --- History UI ---
+// --- History ---
 async function refreshHistory() {
   const host = $("historyList");
   host.innerHTML = "Loading...";
@@ -410,7 +307,25 @@ async function refreshHistory() {
 async function refreshAll() {
   await refreshTemplates();
   await refreshHistory();
-  $("exerciseSearch").dispatchEvent(new Event("input"));
+
+  // Directly load exercise library (no synthetic input event)
+  try {
+    const list = $("exerciseList");
+    list.innerHTML = "Loading...";
+
+    const ex = await loadExercises("");
+
+    list.innerHTML = "";
+    ex.slice(0, 80).forEach((e) => {
+      const card = document.createElement("div");
+      card.className = "item";
+      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
+      list.appendChild(card);
+    });
+
+  } catch (err) {
+    console.error("Initial library load failed:", err);
+  }
 }
 
 sb.auth.onAuthStateChange(async (_event, session) => {
@@ -426,7 +341,6 @@ sb.auth.onAuthStateChange(async (_event, session) => {
   }
 });
 
-// initial session check
 (async () => {
   const { data } = await sb.auth.getSession();
   const user = data.session?.user || null;
