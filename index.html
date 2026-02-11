@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Richard and Kevin's Workout Tracker for our healthy life</title>
+    <title>Richard and Kevin's Workout Tracker (for our healthy life)</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
 
   <body>
     <header>
-      <h1>Richard and Kevin's Workout Tracker for our healthy life</h1>
+      <h1>Richard and Kevin's Workout Tracker (for our healthy life)</h1>
       <div id="userBar" class="row"></div>
     </header>
 
@@ -35,6 +35,7 @@
           <button class="tab" data-tab="workout">Workout</button>
           <button class="tab" data-tab="library">Library</button>
           <button class="tab" data-tab="history">History</button>
+          <button class="tab" data-tab="progress">Progress</button>
         </div>
 
         <!-- Templates -->
@@ -51,7 +52,6 @@
           </div>
 
           <div id="templatesList" class="stack"></div>
-          <!-- removed the “exactly 5 exercises” note since templates can be any length -->
         </div>
 
         <!-- Workout -->
@@ -78,11 +78,21 @@
         <div class="panel hidden" id="tab-history">
           <h2>History</h2>
 
-          <!-- ✅ NEW: detail container shown when you click a workout -->
           <div id="historyDetail" class="stack hidden"></div>
-
-          <!-- existing list -->
           <div id="historyList" class="stack"></div>
+        </div>
+
+        <!-- Progress -->
+        <div class="panel hidden" id="tab-progress">
+          <h2>Progress & PRs</h2>
+
+          <div class="row">
+            <input id="progressSearch" placeholder="Search exercise (e.g., Bench Press)..." />
+          </div>
+
+          <div id="progressSearchResults" class="stack"></div>
+
+          <div id="progressView" class="stack"></div>
         </div>
       </section>
     </main>
