@@ -5,13 +5,14 @@ const SUPABASE_URL = "https://doxyazdbbqpjcbfwcvzr.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveHlhemRiYnFwamNiZndjdnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3ODUwODYsImV4cCI6MjA4NjM2MTA4Nn0.efJGioFAoeOzu5RnFrkKFEMz8GZRttBvMaywYnxdhyc";
 
-// Keep auth/session via supabase-js (works for you)
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window.sb = sb;
 console.log("sb ready", !!window.sb);
 
-// ✅ Store current user id from session (avoid sb.auth.getUser() hangs)
+// ✅ store user/session (avoid sb.auth.getUser() + use JWT for RLS tables)
 let currentUserId = null;
+let currentAccessToken = null;
+
 function getUserIdOrThrow() {
   if (!currentUserId) throw new Error("Not signed in.");
   return currentUserId;
@@ -24,15 +25,23 @@ const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
 
+/**
+ * ✅ fetch helper
+ * - always includes apikey
+ * - uses *user JWT* if available (critical for RLS tables like workout_templates)
+ */
 async function fetchJSON(path, { method = "GET", body } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
+
+  const authToken = currentAccessToken || SUPABASE_ANON_KEY;
+
   try {
     const res = await fetch(`${SUPABASE_URL}${path}`, {
       method,
       headers: {
         apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Authorization: `Bearer ${authToken}`,
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
@@ -135,7 +144,7 @@ $("exerciseSearch").addEventListener("input", async () => {
 });
 
 // ----------------------------
-// ✅ Templates (fetch)
+// ✅ Templates (fetch + USER JWT)
 // ----------------------------
 async function loadTemplatesFull(userId) {
   const tParams = new URLSearchParams();
@@ -147,6 +156,7 @@ async function loadTemplatesFull(userId) {
   if (templates.length === 0) return [];
 
   const ids = templates.map((t) => t.id).join(",");
+
   const teParams = new URLSearchParams();
   teParams.set("select", "id,template_id,exercise_id,order_index");
   teParams.set("template_id", `in.(${ids})`);
@@ -156,6 +166,7 @@ async function loadTemplatesFull(userId) {
 
   const exIds = [...new Set(tex.map((r) => r.exercise_id))];
   let exMap = new Map();
+
   if (exIds.length) {
     const exParams = new URLSearchParams();
     exParams.set("select", "id,name");
@@ -227,7 +238,7 @@ async function refreshTemplates() {
   let userId;
   try {
     userId = getUserIdOrThrow();
-  } catch (_err) {
+  } catch {
     list.innerHTML = `<div class="muted">Not signed in.</div>`;
     return;
   }
@@ -241,6 +252,7 @@ async function refreshTemplates() {
     return;
   }
 
+  // Start dropdown: only templates with 5 items
   const sel = $("startTplSelect");
   sel.innerHTML = "";
   templates.filter((t) => (t.items?.length === 5)).forEach((t) => {
@@ -375,7 +387,6 @@ async function refreshTemplates() {
   }
 }
 
-// Create template button
 $("createTplBtn").addEventListener("click", async () => {
   const name = $("tplName").value.trim();
   const split_type = $("tplSplit").value;
@@ -404,7 +415,6 @@ async function refreshAll() {
   await refreshTemplates();
   await refreshHistory();
 
-  // initial library
   try {
     const list = $("exerciseList");
     list.innerHTML = "Loading...";
@@ -424,7 +434,8 @@ async function refreshAll() {
 
 sb.auth.onAuthStateChange(async (_event, session) => {
   const user = session?.user || null;
-  currentUserId = user?.id || null; // ✅ store id here
+  currentUserId = user?.id || null;
+  currentAccessToken = session?.access_token || null; // ✅ critical for RLS fetches
   renderUserBar(user);
 
   if (user) {
@@ -439,8 +450,10 @@ sb.auth.onAuthStateChange(async (_event, session) => {
 
 (async () => {
   const { data } = await sb.auth.getSession();
-  const user = data.session?.user || null;
-  currentUserId = user?.id || null; // ✅ store id here
+  const session = data.session || null;
+  const user = session?.user || null;
+  currentUserId = user?.id || null;
+  currentAccessToken = session?.access_token || null; // ✅ critical for RLS fetches
   renderUserBar(user);
 
   if (user) {
