@@ -5,6 +5,7 @@ const SUPABASE_URL = "https://doxyazdbbqpjcbfwcvzr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveHlhemRiYnFwamNiZndjdnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3ODUwODYsImV4cCI6MjA4NjM2MTA4Nn0.efJGioFAoeOzu5RnFrkKFEMz8GZRttBvMaywYnxdhyc";
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.sb = sb;
 
 // --- UI helpers ---
 const $ = (id) => document.getElementById(id);
