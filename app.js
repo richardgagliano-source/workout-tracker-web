@@ -204,54 +204,86 @@ $("exerciseSearch").addEventListener("input", async () => {
 // Templates (user-owned)
 // --------------------
 async function loadTemplatesFull(userId) {
-  const { data, error } = await sb
-    .from("workout_templates")
-    .select(`
-      id,
-      name,
-      split_type,
-      created_at,
-      workout_template_exercises (
-        id,
-        template_id,
-        exercise_id,
-        order_index,
-        exercises ( id, name )
-      )
-    `)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  // 1) Templates
+  const tParams = new URLSearchParams();
+  tParams.set("select", "id,name,split_type,created_at");
+  tParams.set("user_id", `eq.${userId}`);
+  tParams.set("order", "created_at.desc");
+  tParams.set("limit", "200");
 
-  if (error) throw error;
+  const templates =
+    (await fetchJSON(`/rest/v1/workout_templates?${tParams.toString()}`)) || [];
+  if (!templates.length) return [];
 
-  return (data || []).map((t) => {
-    const wte = Array.isArray(t.workout_template_exercises) ? t.workout_template_exercises : [];
-    wte.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+  // 2) Template exercises rows
+  const tplIds = templates.map((t) => t.id).join(",");
+  const teParams = new URLSearchParams();
+  teParams.set("select", "id,template_id,exercise_id,order_index");
+  teParams.set("template_id", `in.(${tplIds})`);
+  teParams.set("order", "order_index.asc");
+  teParams.set("limit", "5000");
 
-    const exercises = wte.map((row) => ({
-      wte_id: row.id,
-      template_id: row.template_id,
-      exercise_id: row.exercise_id,
-      order_index: row.order_index,
-      name: row.exercises?.name || "(unknown exercise)",
+  const wte =
+    (await fetchJSON(`/rest/v1/workout_template_exercises?${teParams.toString()}`)) ||
+    [];
+
+  // 3) Exercise names
+  const exIds = [...new Set(wte.map((r) => r.exercise_id).filter(Boolean))];
+  let exMap = new Map();
+  if (exIds.length) {
+    const exParams = new URLSearchParams();
+    exParams.set("select", "id,name");
+    exParams.set("id", `in.(${exIds.join(",")})`);
+    exParams.set("limit", "5000");
+
+    const exRows =
+      (await fetchJSON(`/rest/v1/exercises?${exParams.toString()}`)) || [];
+    exMap = new Map(exRows.map((e) => [e.id, e.name]));
+  }
+
+  // Group template_exercises by template_id
+  const byTpl = new Map();
+  for (const row of wte) {
+    const arr = byTpl.get(row.template_id) || [];
+    arr.push(row);
+    byTpl.set(row.template_id, arr);
+  }
+
+  // Final shape: keep BOTH (raw-ish rows + simplified list)
+  return templates.map((t) => {
+    const rows = (byTpl.get(t.id) || [])
+      .slice()
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    const workout_template_exercises = rows.map((r) => ({
+      ...r,
+      exercises: {
+        id: r.exercise_id,
+        name: exMap.get(r.exercise_id) || "(unknown exercise)",
+      },
     }));
 
-    // Backward compat for Workout tab
-    const items = exercises.map((e) => ({
-      exercise_id: e.exercise_id,
-      order_index: e.order_index,
-      exercise_name: e.name,
+    const exercises = workout_template_exercises.map((r) => ({
+      wte_id: r.id,
+      template_id: r.template_id,
+      exercise_id: r.exercise_id,
+      order_index: r.order_index,
+      name: r.exercises?.name || "(unknown exercise)",
+    }));
+
+    // ALSO: provide "items" so your Workout Start code won’t break
+    const items = exercises.map((x) => ({
+      exercise_id: x.exercise_id,
+      order_index: x.order_index ?? 0,
+      exercise_name: x.name,
     }));
 
     return {
-      id: t.id,
-      name: t.name,
-      split_type: t.split_type,
-      created_at: t.created_at,
-      workout_template_exercises: wte,
+      ...t,
+      workout_template_exercises,
       exercises,
-      exercise_count: exercises.length,
       items,
+      exercise_count: exercises.length,
     };
   });
 }
@@ -290,7 +322,7 @@ async function refreshTemplates() {
   catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
 
   try {
-cachedTemplates = await withTimeout(loadTemplatesFull(userId), 8000, "loadTemplatesFull");
+cachedTemplates = await loadTemplatesFull(userId);
   } catch (err) {
     console.error("Templates load failed:", err);
     list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
