@@ -1,38 +1,35 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-// ✅ Supabase config
+// --- Supabase config (your project) ---
 const SUPABASE_URL = "https://doxyazdbbqpjcbfwcvzr.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveHlhemRiYnFwamNiZndjdnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3ODUwODYsImV4cCI6MjA4NjM2MTA4Nn0.efJGioFAoeOzu5RnFrkKFEMz8GZRttBvMaywYnxdhyc";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveHlhemRiYnFwamNiZndjdnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3ODUwODYsImV4cCI6MjA4NjM2MTA4Nn0.efJGioFAoeOzu5RnFrkKFEMz8GZRttBvMaywYnxdhyc";
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window.sb = sb;
-console.log("sb ready", !!window.sb);
 
-// ✅ store session info (avoid getUser() hangs + use JWT for RLS)
+// --- Session state (store access token + user id for RLS) ---
 let currentUserId = null;
 let currentAccessToken = null;
-
 function getUserIdOrThrow() {
   if (!currentUserId) throw new Error("Not signed in.");
   return currentUserId;
 }
 
-// --- state ---
+// --- App state ---
+let cachedTemplates = [];
 let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
-let cachedTemplates = []; // keep around for workout dropdown + refresh
 
-// --- helpers ---
+// --- DOM helpers ---
 const $ = (id) => document.getElementById(id);
 const show = (el) => el.classList.remove("hidden");
 const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
 
+// --- REST helper (uses user JWT if available) ---
 async function fetchJSON(path, { method = "GET", body } = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-
+  const timer = setTimeout(() => controller.abort(), 12000);
   const authToken = currentAccessToken || SUPABASE_ANON_KEY;
 
   try {
@@ -47,7 +44,6 @@ async function fetchJSON(path, { method = "GET", body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-
     const text = await res.text();
     if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}: ${text}`);
     return text ? JSON.parse(text) : null;
@@ -59,7 +55,9 @@ async function fetchJSON(path, { method = "GET", body } = {}) {
   }
 }
 
-// --- Tabs ---
+// --------------------
+// Tabs UI
+// --------------------
 document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
@@ -70,7 +68,9 @@ document.querySelectorAll(".tab").forEach((btn) => {
   });
 });
 
-// --- Auth ---
+// --------------------
+// Auth
+// --------------------
 $("signInBtn").addEventListener("click", async () => {
   setAuthMsg("");
   const { error } = await sb.auth.signInWithPassword({
@@ -96,22 +96,19 @@ function renderUserBar(user) {
   const el = $("userBar");
   el.innerHTML = "";
   if (!user) return;
-
   const span = document.createElement("span");
   span.className = "small";
   span.textContent = `Signed in as ${user.email}`;
-
   const btn = document.createElement("button");
   btn.className = "secondary";
   btn.textContent = "Sign out";
   btn.onclick = signOut;
-
   el.append(span, btn);
 }
 
-// ------------------------------------------------------
-// ✅ EXERCISES (Library) — public read (via REST)
-// ------------------------------------------------------
+// --------------------
+// Exercises (library)
+// --------------------
 async function loadExercises(search = "") {
   const term = search.trim();
   const params = new URLSearchParams();
@@ -122,7 +119,6 @@ async function loadExercises(search = "") {
   return await fetchJSON(`/rest/v1/exercises?${params.toString()}`);
 }
 
-// --- Library UI ---
 $("exerciseSearch").addEventListener("input", async () => {
   const term = $("exerciseSearch").value.trim();
   const list = $("exerciseList");
@@ -143,25 +139,22 @@ $("exerciseSearch").addEventListener("input", async () => {
   }
 });
 
-// ------------------------------------------------------
-// ✅ TEMPLATES (read/write user-owned via RLS)
-// ------------------------------------------------------
+// --------------------
+// Templates (user-owned)
+// --------------------
 async function loadTemplatesFull(userId) {
   const tParams = new URLSearchParams();
   tParams.set("select", "id,name,split_type,created_at");
   tParams.set("user_id", `eq.${userId}`);
   tParams.set("order", "created_at.desc");
-
   const templates = await fetchJSON(`/rest/v1/workout_templates?${tParams.toString()}`) || [];
   if (templates.length === 0) return [];
 
   const ids = templates.map((t) => t.id).join(",");
-
   const teParams = new URLSearchParams();
   teParams.set("select", "id,template_id,exercise_id,order_index");
   teParams.set("template_id", `in.(${ids})`);
   teParams.set("order", "order_index.asc");
-
   const tex = await fetchJSON(`/rest/v1/workout_template_exercises?${teParams.toString()}`) || [];
 
   const exIds = [...new Set(tex.map((r) => r.exercise_id))];
@@ -198,27 +191,22 @@ async function createTemplate(userId, name, split_type) {
   const created = await fetchJSON(`/rest/v1/workout_templates`, { method: "POST", body });
   return created?.[0];
 }
-
 async function deleteTemplate(templateId) {
   await fetchJSON(`/rest/v1/workout_templates?id=eq.${templateId}`, { method: "DELETE" });
 }
-
 async function addTemplateExercise(templateId, exerciseId, orderIndex) {
   const body = [{ template_id: templateId, exercise_id: exerciseId, order_index: orderIndex }];
   await fetchJSON(`/rest/v1/workout_template_exercises`, { method: "POST", body });
 }
-
 async function deleteTemplateExercise(wteId) {
   await fetchJSON(`/rest/v1/workout_template_exercises?id=eq.${wteId}`, { method: "DELETE" });
 }
-
 async function updateTemplateExerciseOrder(wteId, newOrder) {
   await fetchJSON(`/rest/v1/workout_template_exercises?id=eq.${wteId}`, {
     method: "PATCH",
     body: { order_index: newOrder },
   });
 }
-
 async function reindexTemplate(templateId) {
   const p = new URLSearchParams();
   p.set("select", "id,order_index");
@@ -230,10 +218,28 @@ async function reindexTemplate(templateId) {
   }
 }
 
+function refreshStartWorkoutDropdown() {
+  const sel = $("startTplSelect");
+  sel.innerHTML = "";
+  const templates = (cachedTemplates || []);
+  if (!templates.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Create a template first";
+    sel.appendChild(opt);
+    return;
+  }
+  templates.forEach((t) => {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = `${t.name} (${t.split_type})`;
+    sel.appendChild(opt);
+  });
+}
+
 async function refreshTemplates() {
   const list = $("templatesList");
   list.innerHTML = "Loading...";
-
   let userId;
   try { userId = getUserIdOrThrow(); }
   catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
@@ -246,9 +252,7 @@ async function refreshTemplates() {
     return;
   }
 
-  // Workout dropdown now includes ALL templates
   refreshStartWorkoutDropdown();
-
   list.innerHTML = "";
   if (!cachedTemplates.length) {
     list.innerHTML = `<div class="muted">No templates yet. Create one above.</div>`;
@@ -258,16 +262,13 @@ async function refreshTemplates() {
   for (const t of cachedTemplates) {
     const card = document.createElement("div");
     card.className = "item";
-
     const h = document.createElement("h3");
     h.textContent = t.name;
-
     const pill = document.createElement("span");
     pill.className = "pill";
     pill.textContent = t.split_type;
     h.appendChild(pill);
 
-    // ✅ no 5-limit display
     const meta = document.createElement("div");
     meta.className = "small";
     meta.textContent = `${t.items.length} exercises`;
@@ -328,7 +329,6 @@ async function refreshTemplates() {
       stack.appendChild(row);
     });
 
-    // ✅ always enabled; no max
     const search = document.createElement("input");
     search.placeholder = "Search exercises to add…";
     search.disabled = false;
@@ -380,11 +380,11 @@ async function refreshTemplates() {
   }
 }
 
+// Create template
 $("createTplBtn").addEventListener("click", async () => {
   const name = $("tplName").value.trim();
   const split_type = $("tplSplit").value;
   if (!name) return;
-
   try {
     const userId = getUserIdOrThrow();
     await createTemplate(userId, name, split_type);
@@ -395,36 +395,62 @@ $("createTplBtn").addEventListener("click", async () => {
   }
 });
 
-// ------------------------------------------------------
-// ✅ WORKOUTS (start from template, add sets, save)
-// ------------------------------------------------------
-function refreshStartWorkoutDropdown() {
-  const sel = $("startTplSelect");
-  sel.innerHTML = "";
+// --------------------
+// AUTOFILL: load last sets by exercise (most recent workout per exercise)
+// --------------------
+async function loadLastSetsByExercise(userId, exerciseIds) {
+  if (!exerciseIds.length) return new Map();
 
-  const templates = (cachedTemplates || []);
-  if (!templates.length) {
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "Create a template first";
-    sel.appendChild(opt);
-    return;
+  const idsStr = exerciseIds.join(",");
+  const params = new URLSearchParams();
+  params.set(
+    "select",
+    "weight,reps,set_index,workout_exercises!inner(exercise_id,workout_id,workouts!inner(performed_at,user_id))"
+  );
+  params.set("workout_exercises.exercise_id", `in.(${idsStr})`);
+  params.set("workout_exercises.workouts.user_id", `eq.${userId}`);
+  params.set("order", "workout_exercises.workouts.performed_at.desc,set_index.asc");
+  params.set("limit", "500");
+
+  const rows = await fetchJSON(`/rest/v1/sets?${params.toString()}`) || [];
+
+  const best = new Map();
+  for (const row of rows) {
+    const we = row.workout_exercises;
+    const exId = we?.exercise_id;
+    const perf = we?.workouts?.performed_at;
+    if (!exId || !perf) continue;
+
+    const prev = best.get(exId);
+    if (!prev) best.set(exId, { performed_at: perf, sets: [] });
+    if (best.get(exId).performed_at !== perf) continue;
+
+    best.get(exId).sets.push({
+      set_index: row.set_index ?? 0,
+      weight: row.weight ?? "",
+      reps: row.reps ?? "",
+    });
   }
 
-  templates.forEach((t) => {
-    const opt = document.createElement("option");
-    opt.value = t.id;
-    opt.textContent = `${t.name} (${t.split_type})`;
-    sel.appendChild(opt);
-  });
+  const out = new Map();
+  for (const [exId, info] of best.entries()) {
+    const sets = (info.sets || [])
+      .sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0))
+      .map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }));
+    if (sets.length) out.set(exId, sets);
+  }
+
+  return out;
 }
 
+// --------------------
+// Workouts: create + add exercises + save sets
+// --------------------
 async function createWorkout(userId) {
   const body = [{ user_id: userId, performed_at: new Date().toISOString(), notes: null }];
   const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
   return created?.[0];
 }
-
 async function createWorkoutExercises(workoutId, templateItems) {
   const body = templateItems.map((it) => ({
     workout_id: workoutId,
@@ -434,7 +460,6 @@ async function createWorkoutExercises(workoutId, templateItems) {
   const created = await fetchJSON(`/rest/v1/workout_exercises`, { method: "POST", body });
   return created || [];
 }
-
 async function insertSets(rows) {
   if (!rows.length) return;
   await fetchJSON(`/rest/v1/sets`, { method: "POST", body: rows });
@@ -443,7 +468,6 @@ async function insertSets(rows) {
 function renderActiveWorkout() {
   const host = $("activeWorkout");
   host.innerHTML = "";
-
   if (!activeWorkout) {
     host.innerHTML = `<div class="muted">No active workout. Choose a template and press Start.</div>`;
     return;
@@ -467,13 +491,13 @@ function renderActiveWorkout() {
         const w = document.createElement("input");
         w.placeholder = "weight";
         w.inputMode = "decimal";
-        w.value = s.weight;
+        w.value = s.weight ?? "";
         w.oninput = () => (s.weight = w.value);
 
         const r = document.createElement("input");
         r.placeholder = "reps";
         r.inputMode = "numeric";
-        r.value = s.reps;
+        r.value = s.reps ?? "";
         r.oninput = () => (s.reps = r.value);
 
         const del = document.createElement("button");
@@ -503,59 +527,69 @@ function renderActiveWorkout() {
   });
 }
 
+// Start workout (autofill last sets if available)
 $("startWorkoutBtn").addEventListener("click", async () => {
   setWorkoutMsg("");
 
   const templateId = $("startTplSelect").value;
   if (!templateId) return alert("Pick a template first.");
-
   const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
   if (!tpl) return alert("Template not found. Go to Templates tab and refresh.");
-
-  // ✅ any number of exercises allowed (just not zero)
   if (!tpl.items || tpl.items.length === 0) return alert("This template has no exercises yet.");
 
   try {
     const userId = getUserIdOrThrow();
 
+    // AUTOFILL attempt (non-blocking)
+    const exerciseIds = tpl.items.map((it) => it.exercise_id).filter(Boolean);
+    let lastSetsMap = new Map();
+    try {
+      lastSetsMap = await loadLastSetsByExercise(userId, exerciseIds);
+    } catch (e) {
+      console.warn("Autofill failed (non-blocking):", e);
+      lastSetsMap = new Map();
+    }
+
     const workout = await createWorkout(userId);
     if (!workout?.id) throw new Error("Failed to create workout.");
 
     const weInserted = await createWorkoutExercises(workout.id, tpl.items);
-
-    // map exercise_id -> name from template (already known)
     const nameByExerciseId = new Map(tpl.items.map((it) => [it.exercise_id, it.exercise_name]));
 
     activeWorkout = {
       workoutId: workout.id,
       items: (weInserted || [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-        .map((we) => ({
-          workoutExerciseId: we.id,
-          exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
-          sets: [{ set_index: 0, weight: "", reps: "" }],
-        })),
+        .map((we) => {
+          const prevSets = lastSetsMap.get(we.exercise_id);
+          return {
+            workoutExerciseId: we.id,
+            exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+            sets: (prevSets && prevSets.length)
+              ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
+              : [{ set_index: 0, weight: "", reps: "" }],
+          };
+        }),
     };
 
     renderActiveWorkout();
     show($("saveWorkoutBtn"));
-    setWorkoutMsg("Workout started. Enter sets, then Save.");
+    setWorkoutMsg("Workout started. Autofilled last weights/reps (if available).");
   } catch (err) {
     console.error(err);
     alert(String(err.message || err));
   }
 });
 
+// Save workout sets
 $("saveWorkoutBtn").addEventListener("click", async () => {
   if (!activeWorkout) return;
-
   try {
     const rows = [];
     for (const item of activeWorkout.items) {
       for (const s of item.sets) {
         const hasAny = String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
         if (!hasAny) continue;
-
         rows.push({
           workout_exercise_id: item.workoutExerciseId,
           set_index: s.set_index,
@@ -565,9 +599,7 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
         });
       }
     }
-
     await insertSets(rows);
-
     setWorkoutMsg("Saved ✅");
     activeWorkout = null;
     hide($("saveWorkoutBtn"));
@@ -579,9 +611,9 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
   }
 });
 
-// ------------------------------------------------------
-// ✅ HISTORY (last 20 workouts + exercise count)
-// ------------------------------------------------------
+// --------------------
+// History (last 20 workouts summary)
+// --------------------
 async function loadHistory(userId) {
   const params = new URLSearchParams();
   params.set("select", "id,performed_at,notes");
@@ -591,10 +623,8 @@ async function loadHistory(userId) {
 
   const workouts = await fetchJSON(`/rest/v1/workouts?${params.toString()}`) || [];
   if (!workouts.length) return [];
-
   const ids = workouts.map((w) => w.id).join(",");
 
-  // count workout_exercises per workout
   const weParams = new URLSearchParams();
   weParams.set("select", "workout_id");
   weParams.set("workout_id", `in.(${ids})`);
@@ -603,16 +633,12 @@ async function loadHistory(userId) {
   const counts = new Map();
   wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
 
-  return workouts.map((w) => ({
-    ...w,
-    exercise_count: counts.get(w.id) || 0,
-  }));
+  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
 }
 
 async function refreshHistory() {
   const host = $("historyList");
   host.innerHTML = "Loading...";
-
   let userId;
   try { userId = getUserIdOrThrow(); }
   catch { host.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
@@ -624,7 +650,6 @@ async function refreshHistory() {
       host.innerHTML = `<div class="muted">No workouts yet. Start one in the Workout tab.</div>`;
       return;
     }
-
     rows.forEach((w) => {
       const card = document.createElement("div");
       card.className = "item";
@@ -638,12 +663,13 @@ async function refreshHistory() {
   }
 }
 
-// --- Bootstrap ---
+// --------------------
+// Bootstrap / refreshAll
+// --------------------
 async function refreshAll() {
   await refreshTemplates();
   await refreshHistory();
 
-  // load initial library list
   try {
     const list = $("exerciseList");
     list.innerHTML = "Loading...";
@@ -663,6 +689,7 @@ async function refreshAll() {
   renderActiveWorkout();
 }
 
+// Auth state handling
 sb.auth.onAuthStateChange(async (_event, session) => {
   const user = session?.user || null;
   currentUserId = user?.id || null;
@@ -679,6 +706,7 @@ sb.auth.onAuthStateChange(async (_event, session) => {
   }
 });
 
+// initial session check
 (async () => {
   const { data } = await sb.auth.getSession();
   const session = data.session || null;
@@ -686,7 +714,6 @@ sb.auth.onAuthStateChange(async (_event, session) => {
   currentUserId = user?.id || null;
   currentAccessToken = session?.access_token || null;
   renderUserBar(user);
-
   if (user) {
     hide($("authSection"));
     show($("appSection"));
