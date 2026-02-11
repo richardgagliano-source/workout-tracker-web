@@ -457,6 +457,7 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
 
   return out;
 }
+console.log("✅ Autofill function v2 loaded");
 
 // --------------------
 // Workouts: create + add exercises + save sets
