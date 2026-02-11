@@ -710,7 +710,6 @@ async function refreshHistory() {
     host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
   }
 }
-  });
 }
 function fmtSet(s) {
   const w = s.weight == null ? "—" : s.weight;
