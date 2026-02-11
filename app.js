@@ -401,43 +401,58 @@ $("createTplBtn").addEventListener("click", async () => {
 async function loadLastSetsByExercise(userId, exerciseIds) {
   if (!exerciseIds.length) return new Map();
 
+  // 1) Find most recent workout_exercise per exercise (by workouts.performed_at desc)
   const idsStr = exerciseIds.join(",");
-  const params = new URLSearchParams();
-  params.set(
-    "select",
-    "weight,reps,set_index,workout_exercises!inner(exercise_id,workout_id,workouts!inner(performed_at,user_id))"
-  );
-  params.set("workout_exercises.exercise_id", `in.(${idsStr})`);
-  params.set("workout_exercises.workouts.user_id", `eq.${userId}`);
-  params.set("order", "workout_exercises(workouts(performed_at)).desc,set_index.asc");
-  params.set("limit", "500");
 
-  const rows = await fetchJSON(`/rest/v1/sets?${params.toString()}`) || [];
+  const weParams = new URLSearchParams();
+  weParams.set("select", "id,exercise_id,workouts!inner(performed_at,user_id)");
+  weParams.set("exercise_id", `in.(${idsStr})`);
+  weParams.set("workouts.user_id", `eq.${userId}`);
+  weParams.set("order", "workouts.performed_at.desc");
+  weParams.set("limit", "1000");
 
-  const best = new Map();
-  for (const row of rows) {
-    const we = row.workout_exercises;
-    const exId = we?.exercise_id;
-    const perf = we?.workouts?.performed_at;
-    if (!exId || !perf) continue;
+  const weRows = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
 
-    const prev = best.get(exId);
-    if (!prev) best.set(exId, { performed_at: perf, sets: [] });
-    if (best.get(exId).performed_at !== perf) continue;
-
-    best.get(exId).sets.push({
-      set_index: row.set_index ?? 0,
-      weight: row.weight ?? "",
-      reps: row.reps ?? "",
-    });
+  // pick newest workout_exercise id per exercise_id
+  const latestWEByExercise = new Map(); // exercise_id -> workout_exercise_id
+  for (const r of weRows) {
+    if (!latestWEByExercise.has(r.exercise_id)) {
+      latestWEByExercise.set(r.exercise_id, r.id);
+    }
   }
 
+  const weIds = [...latestWEByExercise.values()];
+  if (!weIds.length) return new Map();
+
+  // 2) Fetch sets for those workout_exercise_ids
+  const setParams = new URLSearchParams();
+  setParams.set("select", "workout_exercise_id,weight,reps,set_index");
+  setParams.set("workout_exercise_id", `in.(${weIds.join(",")})`);
+  setParams.set("order", "workout_exercise_id.asc,set_index.asc");
+  setParams.set("limit", "2000");
+
+  const setRows = (await fetchJSON(`/rest/v1/sets?${setParams.toString()}`)) || [];
+
+  // map weId -> sets[]
+  const setsByWE = new Map();
+  for (const s of setRows) {
+    const arr = setsByWE.get(s.workout_exercise_id) || [];
+    arr.push({
+      set_index: s.set_index ?? 0,
+      weight: s.weight ?? "",
+      reps: s.reps ?? "",
+    });
+    setsByWE.set(s.workout_exercise_id, arr);
+  }
+
+  // final: exercise_id -> normalized sets[]
   const out = new Map();
-  for (const [exId, info] of best.entries()) {
-    const sets = (info.sets || [])
+  for (const [exerciseId, weId] of latestWEByExercise.entries()) {
+    const sets = (setsByWE.get(weId) || [])
       .sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0))
       .map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }));
-    if (sets.length) out.set(exId, sets);
+
+    if (sets.length) out.set(exerciseId, sets);
   }
 
   return out;
