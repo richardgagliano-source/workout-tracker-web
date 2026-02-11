@@ -148,49 +148,26 @@ $("exerciseSearch").addEventListener("input", async () => {
 // Templates (user-owned)
 // --------------------
 async function loadTemplatesFull(userId) {
-  const tParams = new URLSearchParams();
-  tParams.set("select", "id,name,split_type,created_at");
-  tParams.set("user_id", `eq.${userId}`);
-  tParams.set("order", "created_at.desc");
-  const templates = await fetchJSON(`/rest/v1/workout_templates?${tParams.toString()}`) || [];
-  if (templates.length === 0) return [];
+  const { data, error } = await sb
+    .from("workout_templates")
+    .select(`
+      id,
+      name,
+      split_type,
+      workout_template_exercises (
+        id,
+        exercise_id,
+        order_index,
+        exercises ( id, name )
+      )
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-  const ids = templates.map((t) => t.id).join(",");
-
-  const teParams = new URLSearchParams();
-  teParams.set("select", "id,template_id,exercise_id,order_index");
-  teParams.set("template_id", `in.(${ids})`);
-  teParams.set("order", "order_index.asc");
-  const tex = await fetchJSON(`/rest/v1/workout_template_exercises?${teParams.toString()}`) || [];
-
-  const exIds = [...new Set(tex.map((r) => r.exercise_id))];
-  let exMap = new Map();
-  if (exIds.length) {
-    const exParams = new URLSearchParams();
-    exParams.set("select", "id,name");
-    exParams.set("id", `in.(${exIds.join(",")})`);
-    const exRows = await fetchJSON(`/rest/v1/exercises?${exParams.toString()}`) || [];
-    exMap = new Map(exRows.map((e) => [e.id, e.name]));
-  }
-
-  const byTemplate = new Map();
-  tex.forEach((r) => {
-    const arr = byTemplate.get(r.template_id) || [];
-    arr.push({
-      id: r.id,
-      template_id: r.template_id,
-      exercise_id: r.exercise_id,
-      order_index: r.order_index,
-      exercise_name: exMap.get(r.exercise_id) || "Exercise",
-    });
-    byTemplate.set(r.template_id, arr);
-  });
-
-  return templates.map((t) => ({
-    ...t,
-    items: (byTemplate.get(t.id) || []).sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)),
-  }));
+  if (error) throw error;
+  return data || [];
 }
+
 
 async function createTemplate(userId, name, split_type) {
   const body = [{ user_id: userId, name, split_type }];
@@ -411,13 +388,26 @@ for (const t of cachedTemplates) {
       b.onclick = async (ev) => {
         ev.stopPropagation();
 
-        // order_index = end of list
-        const nextIndex = current.length;
-        const { error } = await sb.from("workout_template_exercises").insert({
-          template_id: t.id,
-          exercise_id: exRow.id,
-          order_index: nextIndex
-        });
+        // Always compute next order_index from DB (not current.length)
+const { data: lastRow, error: lastErr } = await sb
+  .from("workout_template_exercises")
+  .select("order_index")
+  .eq("template_id", t.id)
+  .order("order_index", { ascending: false })
+  .limit(1);
+
+if (lastErr) {
+  alert(lastErr.message);
+  return;
+}
+
+const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+
+const { error } = await sb.from("workout_template_exercises").insert({
+  template_id: t.id,
+  exercise_id: exRow.id,
+  order_index: nextIndex
+});
         if (error) alert(error.message);
         await refreshTemplates();
       };
