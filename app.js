@@ -18,7 +18,7 @@ function getUserIdOrThrow() {
 
 // --- App state ---
 let cachedTemplates = [];
-let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
+let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
 
 // --- DOM helpers ---
 const $ = (id) => document.getElementById(id);
@@ -58,6 +58,52 @@ async function fetchJSON(path, { method = "GET", body } = {}) {
 }
 
 // --------------------
+// Small helpers
+// --------------------
+function uniq(arr) {
+  return [...new Set(arr)];
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function numOrNull(v) {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Estimated 1RM (Epley). If reps missing, return null.
+function epley1RM(weight, reps) {
+  const w = Number(weight);
+  const r = Number(reps);
+  if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return null;
+  return w * (1 + r / 30);
+}
+
+// Best set selection for “top set” style display
+function bestSet(sets) {
+  // Prefer highest e1RM, tie-break on weight
+  let best = null;
+  for (const s of sets) {
+    const w = s.weight;
+    const r = s.reps;
+    const e1 = epley1RM(w, r);
+    const cand = { ...s, e1rm: e1 };
+    if (!best) { best = cand; continue; }
+    const be = best.e1rm ?? -Infinity;
+    const ce = cand.e1rm ?? -Infinity;
+    if (ce > be) best = cand;
+    else if (ce === be && (cand.weight ?? -Infinity) > (best.weight ?? -Infinity)) best = cand;
+  }
+  return best;
+}
+
+// --------------------
 // Tabs UI
 // --------------------
 document.querySelectorAll(".tab").forEach((btn) => {
@@ -65,7 +111,7 @@ document.querySelectorAll(".tab").forEach((btn) => {
     document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     const tab = btn.dataset.tab;
-    ["templates", "workout", "library", "history"].forEach((t) => hide($(`tab-${t}`)));
+    ["templates", "workout", "library", "history", "progress"].forEach((t) => hide($(`tab-${t}`)));
     show($(`tab-${tab}`));
   });
 });
@@ -172,7 +218,6 @@ async function loadTemplatesFull(userId) {
     const wte = Array.isArray(t.workout_template_exercises) ? t.workout_template_exercises : [];
     wte.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-    // simplified list
     const exercises = wte.map((row) => ({
       wte_id: row.id,
       template_id: row.template_id,
@@ -181,7 +226,7 @@ async function loadTemplatesFull(userId) {
       name: row.exercises?.name || "(unknown exercise)",
     }));
 
-    // ✅ Backward compat: what your Workout tab expects
+    // Backward compat for Workout tab
     const items = exercises.map((e) => ({
       exercise_id: e.exercise_id,
       order_index: e.order_index,
@@ -193,48 +238,18 @@ async function loadTemplatesFull(userId) {
       name: t.name,
       split_type: t.split_type,
       created_at: t.created_at,
-
       workout_template_exercises: wte,
       exercises,
       exercise_count: exercises.length,
-
-      // ✅ important for Workout tab
       items,
     };
   });
 }
 
-
 async function createTemplate(userId, name, split_type) {
   const body = [{ user_id: userId, name, split_type }];
   const created = await fetchJSON(`/rest/v1/workout_templates`, { method: "POST", body });
   return created?.[0];
-}
-async function deleteTemplate(templateId) {
-  await fetchJSON(`/rest/v1/workout_templates?id=eq.${templateId}`, { method: "DELETE" });
-}
-async function addTemplateExercise(templateId, exerciseId, orderIndex) {
-  const body = [{ template_id: templateId, exercise_id: exerciseId, order_index: orderIndex }];
-  await fetchJSON(`/rest/v1/workout_template_exercises`, { method: "POST", body });
-}
-async function deleteTemplateExercise(wteId) {
-  await fetchJSON(`/rest/v1/workout_template_exercises?id=eq.${wteId}`, { method: "DELETE" });
-}
-async function updateTemplateExerciseOrder(wteId, newOrder) {
-  await fetchJSON(`/rest/v1/workout_template_exercises?id=eq.${wteId}`, {
-    method: "PATCH",
-    body: { order_index: newOrder },
-  });
-}
-async function reindexTemplate(templateId) {
-  const p = new URLSearchParams();
-  p.set("select", "id,order_index");
-  p.set("template_id", `eq.${templateId}`);
-  p.set("order", "order_index.asc");
-  const rows = await fetchJSON(`/rest/v1/workout_template_exercises?${p.toString()}`) || [];
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].order_index !== i) await updateTemplateExerciseOrder(rows[i].id, i);
-  }
 }
 
 function refreshStartWorkoutDropdown() {
@@ -264,17 +279,13 @@ async function refreshTemplates() {
   try { userId = getUserIdOrThrow(); }
   catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
 
-try {
-  cachedTemplates = await Promise.race([
-    loadTemplatesFull(userId),
-    new Promise((_, rej) => setTimeout(() => rej(new Error("loadTemplatesFull timed out")), 8000)),
-  ]);
-} catch (err) {
-  console.error("Templates load failed:", err);
-  list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
-  return;
-}
-
+  try {
+    cachedTemplates = await loadTemplatesFull(userId);
+  } catch (err) {
+    console.error("Templates load failed:", err);
+    list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
+    return;
+  }
 
   refreshStartWorkoutDropdown();
 
@@ -284,213 +295,206 @@ try {
     return;
   }
 
-for (const t of cachedTemplates) {
-  const card = document.createElement("div");
-  card.className = "item";
+  for (const t of cachedTemplates) {
+    const card = document.createElement("div");
+    card.className = "item";
 
-  // --- Header row (always visible) ---
-  const header = document.createElement("div");
-  header.style.display = "flex";
-  header.style.alignItems = "center";
-  header.style.justifyContent = "space-between";
-  header.style.gap = "12px";
-  header.style.cursor = "pointer";
+    // Header row
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+    header.style.gap = "12px";
+    header.style.cursor = "pointer";
 
-  const left = document.createElement("div");
+    const left = document.createElement("div");
 
-  const h = document.createElement("h3");
-  h.style.margin = "0";
-  h.textContent = t.name;
+    const h = document.createElement("h3");
+    h.style.margin = "0";
+    h.textContent = t.name;
 
-  const pill = document.createElement("span");
-  pill.className = "pill";
-  pill.textContent = t.split_type;
+    const pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = t.split_type;
 
-  // put pill next to name
-  h.appendChild(document.createTextNode(" "));
-  h.appendChild(pill);
+    h.appendChild(document.createTextNode(" "));
+    h.appendChild(pill);
 
-  const meta = document.createElement("div");
-  meta.className = "small";
-  const exCount = (t.workout_template_exercises || []).length;
-  meta.textContent = `${exCount} exercise${exCount === 1 ? "" : "s"}`;
+    const meta = document.createElement("div");
+    meta.className = "small";
+    const exCount = (t.workout_template_exercises || []).length;
+    meta.textContent = `${exCount} exercise${exCount === 1 ? "" : "s"}`;
 
-  left.appendChild(h);
-  left.appendChild(meta);
+    left.appendChild(h);
+    left.appendChild(meta);
 
-  const chevron = document.createElement("div");
-  chevron.className = "small";
-  chevron.textContent = "Show ▾";
+    const chevron = document.createElement("div");
+    chevron.className = "small";
+    chevron.textContent = "Show ▾";
 
-  header.appendChild(left);
-  header.appendChild(chevron);
+    header.appendChild(left);
+    header.appendChild(chevron);
 
-  // --- Details (hidden until click) ---
-  const details = document.createElement("div");
-  details.className = "stack hidden";
+    // Details hidden
+    const details = document.createElement("div");
+    details.className = "stack hidden";
 
-  const current = (t.workout_template_exercises || [])
-    .slice()
-    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const current = (t.workout_template_exercises || [])
+      .slice()
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-  // list of exercises (with move + remove)
-  const ul = document.createElement("div");
-  ul.className = "stack";
+    // exercise list
+    const ul = document.createElement("div");
+    ul.className = "stack";
 
-  current.forEach((x, idx) => {
-    const row = document.createElement("div");
-    row.className = "item";
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.justifyContent = "space-between";
-    row.style.gap = "12px";
+    current.forEach((x, idx) => {
+      const row = document.createElement("div");
+      row.className = "item";
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.justifyContent = "space-between";
+      row.style.gap = "12px";
 
-    const name = x.exercises?.name || "Exercise";
-    const leftText = document.createElement("div");
-    leftText.innerHTML = `<b>${idx + 1}.</b> ${name}`;
+      const name = x.exercises?.name || "Exercise";
+      const leftText = document.createElement("div");
+      leftText.innerHTML = `<b>${idx + 1}.</b> ${name}`;
 
-    const actions = document.createElement("div");
-    actions.style.display = "flex";
-    actions.style.gap = "8px";
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.gap = "8px";
 
-    const up = document.createElement("button");
-    up.className = "secondary";
-    up.textContent = "↑";
-    up.disabled = idx === 0;
-    up.onclick = async (e) => {
+      const up = document.createElement("button");
+      up.className = "secondary";
+      up.textContent = "↑";
+      up.disabled = idx === 0;
+      up.onclick = async (e) => {
+        e.stopPropagation();
+        const above = current[idx - 1];
+        const me = x;
+        if (!above) return;
+
+        const a = above.order_index ?? (idx - 1);
+        const b = me.order_index ?? idx;
+
+        await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
+        await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        await refreshTemplates();
+      };
+
+      const down = document.createElement("button");
+      down.className = "secondary";
+      down.textContent = "↓";
+      down.disabled = idx === current.length - 1;
+      down.onclick = async (e) => {
+        e.stopPropagation();
+        const below = current[idx + 1];
+        const me = x;
+        if (!below) return;
+
+        const a = below.order_index ?? (idx + 1);
+        const b = me.order_index ?? idx;
+
+        await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
+        await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        await refreshTemplates();
+      };
+
+      const del = document.createElement("button");
+      del.className = "secondary";
+      del.textContent = "Remove";
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        const ok = confirm("Remove this exercise from the template?");
+        if (!ok) return;
+        const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
+        if (error) alert(error.message);
+        await refreshTemplates();
+      };
+
+      actions.append(up, down, del);
+      row.append(leftText, actions);
+      ul.appendChild(row);
+    });
+
+    // search to add
+    const search = document.createElement("input");
+    search.placeholder = "Search exercises to add…";
+
+    const results = document.createElement("div");
+    results.className = "stack";
+
+    search.addEventListener("input", async (e) => {
       e.stopPropagation();
-      const above = current[idx - 1];
-      const me = x;
-      if (!above) return;
+      const term = search.value.trim();
+      results.innerHTML = "";
+      if (term.length < 2) return;
 
-      const a = above.order_index ?? (idx - 1);
-      const b = me.order_index ?? idx;
+      const ex = await loadExercises(term);
+      ex.slice(0, 10).forEach((exRow) => {
+        const b = document.createElement("button");
+        b.className = "secondary";
+        b.textContent = `Add: ${exRow.name}`;
 
-      // swap order_index
-      await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
-      await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-      await refreshTemplates();
-    };
+        b.onclick = async (ev) => {
+          ev.stopPropagation();
 
-    const down = document.createElement("button");
-    down.className = "secondary";
-    down.textContent = "↓";
-    down.disabled = idx === current.length - 1;
-    down.onclick = async (e) => {
+          const already = current.some(r => r.exercise_id === exRow.id);
+          if (already) { alert("That exercise is already in this template."); return; }
+
+          // next order_index = max+1 from DB (avoid collisions)
+          const { data: lastRow, error: lastErr } = await sb
+            .from("workout_template_exercises")
+            .select("order_index")
+            .eq("template_id", t.id)
+            .order("order_index", { ascending: false })
+            .limit(1);
+
+          if (lastErr) { alert(lastErr.message); return; }
+
+          const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+
+          const { error: insErr } = await sb.from("workout_template_exercises").insert({
+            template_id: t.id,
+            exercise_id: exRow.id,
+            order_index: nextIndex,
+          });
+
+          if (insErr) { alert(insErr.message); return; }
+
+          await refreshTemplates();
+        };
+
+        results.appendChild(b);
+      });
+    });
+
+    const delTpl = document.createElement("button");
+    delTpl.className = "secondary";
+    delTpl.textContent = "Delete template";
+    delTpl.onclick = async (e) => {
       e.stopPropagation();
-      const below = current[idx + 1];
-      const me = x;
-      if (!below) return;
-
-      const a = below.order_index ?? (idx + 1);
-      const b = me.order_index ?? idx;
-
-      await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
-      await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-      await refreshTemplates();
-    };
-
-    const del = document.createElement("button");
-    del.className = "secondary";
-    del.textContent = "Remove";
-    del.onclick = async (e) => {
-      e.stopPropagation();
-      const ok = confirm("Remove this exercise from the template?");
-      if (!ok) return;
-      const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
+      if (!confirm("Delete this template?")) return;
+      const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
       if (error) alert(error.message);
       await refreshTemplates();
     };
 
-    actions.append(up, down, del);
-    row.append(leftText, actions);
-    ul.appendChild(row);
-  });
+    details.append(ul, search, results, delTpl);
 
-  // search to add
-  const search = document.createElement("input");
-  search.placeholder = "Search exercises to add…";
-
-  const results = document.createElement("div");
-  results.className = "stack";
-
-  search.addEventListener("input", async (e) => {
-    e.stopPropagation();
-    const term = search.value.trim();
-    results.innerHTML = "";
-    if (term.length < 2) return;
-
-    const ex = await loadExercises(term);
-    ex.slice(0, 10).forEach((exRow) => {
-      const b = document.createElement("button");
-      b.className = "secondary";
-      b.textContent = `Add: ${exRow.name}`;
-b.onclick = async (ev) => {
-  ev.stopPropagation();
-const already = current.some(r => r.exercise_id === exRow.id);
-  if (already) {alert("That exercise is already in this template.");return;}
-
-  // Compute next order_index from DB (avoid collisions & gaps)
-  const { data: lastRow, error: lastErr } = await sb
-    .from("workout_template_exercises")
-    .select("order_index")
-    .eq("template_id", t.id)
-    .order("order_index", { ascending: false })
-    .limit(1);
-
-  if (lastErr) {
-    alert(lastErr.message);
-    return;
-  }
-
-  const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
-
-  const { error: insErr } = await sb.from("workout_template_exercises").insert({
-    template_id: t.id,
-    exercise_id: exRow.id,
-    order_index: nextIndex,
-  });
-
-  if (insErr) {
-    alert(insErr.message);
-    return;
-  }
-
-  await refreshTemplates();
-};
-
-      results.appendChild(b);
+    header.addEventListener("click", () => {
+      const isHidden = details.classList.contains("hidden");
+      if (isHidden) {
+        details.classList.remove("hidden");
+        chevron.textContent = "Hide ▴";
+      } else {
+        details.classList.add("hidden");
+        chevron.textContent = "Show ▾";
+      }
     });
-  });
 
-  const delTpl = document.createElement("button");
-  delTpl.className = "secondary";
-  delTpl.textContent = "Delete template";
-  delTpl.onclick = async (e) => {
-    e.stopPropagation();
-    if (!confirm("Delete this template?")) return;
-    const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
-    if (error) alert(error.message);
-    await refreshTemplates();
-  };
-
-  details.append(ul, search, results, delTpl);
-
-  // toggle open/close
-  header.addEventListener("click", () => {
-    const isHidden = details.classList.contains("hidden");
-    if (isHidden) {
-      details.classList.remove("hidden");
-      chevron.textContent = "Hide ▴";
-    } else {
-      details.classList.add("hidden");
-      chevron.textContent = "Show ▾";
-    }
-  });
-
-  card.append(header, details);
-  list.appendChild(card);
-}
+    card.append(header, details);
+    list.appendChild(card);
+  }
 }
 
 $("createTplBtn").addEventListener("click", async () => {
@@ -508,7 +512,7 @@ $("createTplBtn").addEventListener("click", async () => {
 });
 
 // --------------------
-// AUTOFILL (FIXED): Two-call approach with simple order syntax
+// AUTOFILL: Two-call approach with simple order syntax
 // --------------------
 async function loadLastSetsByExercise(userId, exerciseIds) {
   if (!exerciseIds.length) return new Map();
@@ -520,7 +524,7 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
   weParams.set("select", "id,exercise_id,workout_id");
   weParams.set("exercise_id", `in.(${idsStr})`);
   weParams.set("order", "workout_id.desc");
-  weParams.set("limit", "10000"); // more rows so we can find one with sets
+  weParams.set("limit", "10000");
 
   const weRows = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
   if (!weRows.length) return new Map();
@@ -549,7 +553,6 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
   // 3) For each exercise, pick the newest workout_exercise that has sets
   const out = new Map();
 
-  // group WEs by exercise
   const wesByExercise = new Map();
   for (const r of weRows) {
     const arr = wesByExercise.get(r.exercise_id) || [];
@@ -558,7 +561,9 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
   }
 
   for (const exerciseId of exerciseIds) {
-    const candidates = (wesByExercise.get(exerciseId) || []).sort((a, b) => (b.workout_id ?? 0) - (a.workout_id ?? 0));
+    const candidates = (wesByExercise.get(exerciseId) || []).sort(
+      (a, b) => (b.workout_id ?? 0) - (a.workout_id ?? 0)
+    );
     const withSets = candidates.find((we) => (setsByWE.get(we.id) || []).length > 0);
     if (!withSets) continue;
 
@@ -580,6 +585,7 @@ async function createWorkout(userId) {
   const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
   return created?.[0];
 }
+
 async function createWorkoutExercises(workoutId, templateItems) {
   const body = templateItems.map((it) => ({
     workout_id: workoutId,
@@ -589,6 +595,7 @@ async function createWorkoutExercises(workoutId, templateItems) {
   const created = await fetchJSON(`/rest/v1/workout_exercises`, { method: "POST", body });
   return created || [];
 }
+
 async function insertSets(rows) {
   if (!rows.length) return;
   await fetchJSON(`/rest/v1/sets`, { method: "POST", body: rows });
@@ -633,7 +640,9 @@ function renderActiveWorkout() {
         del.className = "secondary";
         del.textContent = "Remove";
         del.onclick = () => {
-          item.sets = item.sets.filter((_, j) => j !== si).map((x, j) => ({ ...x, set_index: j }));
+          item.sets = item.sets
+            .filter((_, j) => j !== si)
+            .map((x, j) => ({ ...x, set_index: j }));
           renderSets();
         };
 
@@ -694,6 +703,7 @@ $("startWorkoutBtn").addEventListener("click", async () => {
           const prevSets = lastSetsMap.get(we.exercise_id);
           return {
             workoutExerciseId: we.id,
+            exerciseId: we.exercise_id,
             exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
             sets: (prevSets && prevSets.length)
               ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
@@ -711,10 +721,292 @@ $("startWorkoutBtn").addEventListener("click", async () => {
   }
 });
 
-// Save workout sets
+// --------------------
+// Progress + PR detection (NEW)
+// --------------------
+
+// Pull recent workout ids for user (so we can avoid fragile nested PostgREST filters)
+async function loadRecentWorkoutIds(userId, limit = 2000) {
+  const p = new URLSearchParams();
+  p.set("select", "id,performed_at");
+  p.set("user_id", `eq.${userId}`);
+  p.set("order", "performed_at.desc");
+  p.set("limit", String(limit));
+  return (await fetchJSON(`/rest/v1/workouts?${p.toString()}`)) || [];
+}
+
+// Pull all sets for ONE exercise across recent workouts (chunked)
+async function loadExerciseHistory(userId, exerciseId, { workoutLimit = 2000 } = {}) {
+  const workouts = await loadRecentWorkoutIds(userId, workoutLimit);
+  if (!workouts.length) return [];
+
+  const workoutIds = workouts.map(w => w.id);
+  const workoutDateById = new Map(workouts.map(w => [w.id, w.performed_at]));
+
+  // 1) workout_exercises for those workouts, filtered to exerciseId
+  const weRows = [];
+  for (const idsChunk of chunk(workoutIds, 150)) {
+    const p = new URLSearchParams();
+    p.set("select", "id,workout_id,exercise_id,order_index");
+    p.set("workout_id", `in.(${idsChunk.join(",")})`);
+    p.set("exercise_id", `eq.${exerciseId}`);
+    p.set("limit", "10000");
+    const rows = (await fetchJSON(`/rest/v1/workout_exercises?${p.toString()}`)) || [];
+    weRows.push(...rows);
+  }
+
+  if (!weRows.length) return [];
+
+  const weIds = weRows.map(r => r.id);
+
+  // 2) sets for those workout_exercise ids
+  const setRows = [];
+  for (const idsChunk of chunk(weIds, 150)) {
+    const p = new URLSearchParams();
+    p.set("select", "workout_exercise_id,set_index,weight,reps");
+    p.set("workout_exercise_id", `in.(${idsChunk.join(",")})`);
+    p.set("order", "workout_exercise_id.asc,set_index.asc");
+    p.set("limit", "20000");
+    const rows = (await fetchJSON(`/rest/v1/sets?${p.toString()}`)) || [];
+    setRows.push(...rows);
+  }
+
+  // stitch into sessions by workout_id
+  const weById = new Map(weRows.map(r => [r.id, r]));
+  const setsByWorkout = new Map(); // workout_id -> sets[]
+  for (const s of setRows) {
+    const we = weById.get(s.workout_exercise_id);
+    if (!we) continue;
+    const wid = we.workout_id;
+    const arr = setsByWorkout.get(wid) || [];
+    arr.push({
+      workout_id: wid,
+      performed_at: workoutDateById.get(wid) || null,
+      weight: s.weight,
+      reps: s.reps,
+      set_index: s.set_index ?? 0,
+    });
+    setsByWorkout.set(wid, arr);
+  }
+
+  // finalize: one row per workout for this exercise
+  const out = [];
+  for (const [wid, sets] of setsByWorkout.entries()) {
+    const cleanSets = sets
+      .slice()
+      .sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0))
+      .map(s => ({
+        set_index: s.set_index ?? 0,
+        weight: s.weight,
+        reps: s.reps,
+      }));
+
+    const top = bestSet(cleanSets) || null;
+    const volume = cleanSets.reduce((sum, s) => {
+      const w = Number(s.weight);
+      const r = Number(s.reps);
+      if (!Number.isFinite(w) || !Number.isFinite(r)) return sum;
+      return sum + (w * r);
+    }, 0);
+
+    out.push({
+      workout_id: wid,
+      performed_at: workouts.find(x => x.id === wid)?.performed_at || null,
+      sets: cleanSets,
+      best_weight: top?.weight ?? null,
+      best_reps: top?.reps ?? null,
+      best_e1rm: top?.e1rm ?? null,
+      volume,
+    });
+  }
+
+  out.sort((a, b) => new Date(b.performed_at) - new Date(a.performed_at));
+  return out;
+}
+
+function computePRsFromHistory(historyRows) {
+  let maxWeight = null;
+  let bestE1 = null;
+
+  for (const row of historyRows) {
+    for (const s of row.sets || []) {
+      const w = Number(s.weight);
+      const r = Number(s.reps);
+      if (Number.isFinite(w)) {
+        if (maxWeight == null || w > maxWeight) maxWeight = w;
+      }
+      const e1 = epley1RM(w, r);
+      if (e1 != null) {
+        if (bestE1 == null || e1 > bestE1) bestE1 = e1;
+      }
+    }
+  }
+
+  return { maxWeight, bestE1RM: bestE1 };
+}
+
+async function detectPRsForWorkout(userId, workoutItems) {
+  // workoutItems: [{exerciseId, exerciseName, sets:[{weight,reps}]}]
+  const results = [];
+
+  const exerciseIds = uniq(workoutItems.map(it => it.exerciseId).filter(Boolean));
+  for (const exId of exerciseIds) {
+    const item = workoutItems.find(it => it.exerciseId === exId);
+    const name = item?.exerciseName || "Exercise";
+
+    const currentSets = (workoutItems
+      .filter(it => it.exerciseId === exId)
+      .flatMap(it => it.sets || [])
+      .map(s => ({ weight: numOrNull(s.weight), reps: numOrNull(s.reps) }))
+      .filter(s => s.weight != null || s.reps != null))
+      .map(s => ({ ...s, e1rm: epley1RM(s.weight, s.reps) }));
+
+    const curMaxWeight = currentSets.reduce((m, s) => (s.weight != null ? Math.max(m, s.weight) : m), -Infinity);
+    const curBestE1 = currentSets.reduce((m, s) => (s.e1rm != null ? Math.max(m, s.e1rm) : m), -Infinity);
+
+    // history excluding "right now" is hard without joining; simplest = compute PRs, then compare using <=
+    // If you want exact exclusion of current workout, we can add later.
+    const hist = await loadExerciseHistory(userId, exId, { workoutLimit: 2000 });
+    const prs = computePRsFromHistory(hist);
+
+    const hitMaxW = (curMaxWeight !== -Infinity) && (prs.maxWeight == null || curMaxWeight > prs.maxWeight);
+    const hitE1 = (curBestE1 !== -Infinity) && (prs.bestE1RM == null || curBestE1 > prs.bestE1RM);
+
+    if (hitMaxW || hitE1) {
+      results.push({
+        exerciseId: exId,
+        exerciseName: name,
+        newMaxWeight: hitMaxW ? curMaxWeight : null,
+        newBestE1RM: hitE1 ? curBestE1 : null,
+      });
+    }
+  }
+
+  return results;
+}
+
+// Progress UI wiring
+let progressSearchTimer = null;
+
+async function renderProgressExercise(exerciseId, exerciseName) {
+  const view = $("progressView");
+  view.innerHTML = "Loading...";
+
+  let userId;
+  try { userId = getUserIdOrThrow(); }
+  catch { view.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
+
+  try {
+    const hist = await loadExerciseHistory(userId, exerciseId, { workoutLimit: 2000 });
+    if (!hist.length) {
+      view.innerHTML = `<div class="muted">No history found for <b>${exerciseName}</b> yet.</div>`;
+      return;
+    }
+
+    const prs = computePRsFromHistory(hist);
+
+    const prCard = document.createElement("div");
+    prCard.className = "item";
+    prCard.innerHTML = `
+      <h3>${exerciseName}</h3>
+      <div class="small">
+        <b>PR (Max weight):</b> ${prs.maxWeight == null ? "—" : prs.maxWeight}<br/>
+        <b>PR (Best e1RM):</b> ${prs.bestE1RM == null ? "—" : prs.bestE1RM.toFixed(1)}
+      </div>
+    `;
+
+    const table = document.createElement("div");
+    table.className = "item";
+
+    const rowsHtml = hist.slice(0, 25).map((r) => {
+      const dt = r.performed_at ? new Date(r.performed_at).toLocaleString() : "—";
+      const best = (r.best_weight != null || r.best_reps != null)
+        ? `${r.best_weight ?? "—"} × ${r.best_reps ?? "—"}`
+        : "—";
+      const e1 = r.best_e1rm != null ? r.best_e1rm.toFixed(1) : "—";
+      const vol = Number.isFinite(r.volume) ? Math.round(r.volume) : "—";
+      return `<tr>
+        <td>${dt}</td>
+        <td>${best}</td>
+        <td>${e1}</td>
+        <td>${vol}</td>
+      </tr>`;
+    }).join("");
+
+    table.innerHTML = `
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <h3 style="margin:0;">Recent sessions</h3>
+        <div class="small muted">Showing latest 25</div>
+      </div>
+      <div style="overflow:auto;">
+        <table style="width:100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:6px 4px;">Date</th>
+              <th style="text-align:left; padding:6px 4px;">Best set</th>
+              <th style="text-align:left; padding:6px 4px;">Best e1RM</th>
+              <th style="text-align:left; padding:6px 4px;">Volume</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    `;
+
+    view.innerHTML = "";
+    view.append(prCard, table);
+  } catch (err) {
+    console.error(err);
+    view.innerHTML = `<div class="muted">Error loading progress: ${String(err.message || err)}</div>`;
+  }
+}
+
+function wireProgressSearch() {
+  const input = $("progressSearch");
+  const results = $("progressSearchResults");
+  const view = $("progressView");
+  if (!input || !results || !view) return;
+
+  input.addEventListener("input", () => {
+    clearTimeout(progressSearchTimer);
+    progressSearchTimer = setTimeout(async () => {
+      const term = input.value.trim();
+      results.innerHTML = "";
+      view.innerHTML = "";
+      if (term.length < 2) return;
+
+      try {
+        const ex = await loadExercises(term);
+        if (!ex || !ex.length) {
+          results.innerHTML = `<div class="muted">No matches.</div>`;
+          return;
+        }
+
+        ex.slice(0, 10).forEach((row) => {
+          const b = document.createElement("button");
+          b.className = "secondary";
+          b.textContent = row.name;
+          b.onclick = () => {
+            results.innerHTML = "";
+            input.value = row.name;
+            renderProgressExercise(row.id, row.name);
+          };
+          results.appendChild(b);
+        });
+      } catch (e) {
+        console.error(e);
+        results.innerHTML = `<div class="muted">Error searching exercises.</div>`;
+      }
+    }, 250);
+  });
+}
+
+// Save workout sets (+ PR detection)
 $("saveWorkoutBtn").addEventListener("click", async () => {
   if (!activeWorkout) return;
   try {
+    const userId = getUserIdOrThrow();
+
     const rows = [];
     for (const item of activeWorkout.items) {
       for (const s of item.sets) {
@@ -729,8 +1021,27 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
         });
       }
     }
+
     await insertSets(rows);
-    setWorkoutMsg("Saved ✅");
+
+    // PR detection (best-effort; don’t block save UX)
+    let prMsg = "";
+    try {
+      const prs = await detectPRsForWorkout(userId, activeWorkout.items);
+      if (prs.length) {
+        const lines = prs.map(p => {
+          const bits = [];
+          if (p.newMaxWeight != null) bits.push(`Max weight PR: ${p.newMaxWeight}`);
+          if (p.newBestE1RM != null) bits.push(`e1RM PR: ${p.newBestE1RM.toFixed(1)}`);
+          return `🏆 ${p.exerciseName} — ${bits.join(" | ")}`;
+        });
+        prMsg = "\n" + lines.join("\n");
+      }
+    } catch (e) {
+      console.warn("PR detection failed (non-blocking):", e);
+    }
+
+    setWorkoutMsg(`Saved ✅${prMsg}`);
     activeWorkout = null;
     hide($("saveWorkoutBtn"));
     renderActiveWorkout();
@@ -770,7 +1081,6 @@ async function refreshHistory() {
   const host = $("historyList");
   const detail = $("historyDetail");
 
-  // reset to list view
   detail.classList.add("hidden");
   detail.innerHTML = "";
   host.classList.remove("hidden");
@@ -803,8 +1113,6 @@ async function refreshHistory() {
       const exCount = w.exercise_count ?? 0;
 
       card.innerHTML = `<h3>${dt}</h3><div class="small">${exCount} exercises</div>`;
-
-      // ✅ CLICK HANDLER
       card.addEventListener("click", () => showWorkoutDetail(w.id));
 
       host.appendChild(card);
@@ -814,6 +1122,7 @@ async function refreshHistory() {
     host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
   }
 }
+
 function fmtSet(s) {
   const w = s.weight == null ? "—" : s.weight;
   const r = s.reps == null ? "—" : s.reps;
@@ -821,7 +1130,6 @@ function fmtSet(s) {
 }
 
 async function loadWorkoutDetail(workoutId) {
-  // Pull workout + exercises + sets (then we’ll sort/group in JS)
   const { data, error } = await sb
     .from("workouts")
     .select(`
@@ -840,7 +1148,6 @@ async function loadWorkoutDetail(workoutId) {
 
   if (error) throw error;
 
-  // Normalize ordering
   const wes = (data.workout_exercises || [])
     .slice()
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
@@ -929,6 +1236,9 @@ async function refreshAll() {
     $("exerciseList").innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
 
+  // wire once (safe to call repeatedly)
+  wireProgressSearch();
+
   renderActiveWorkout();
 }
 
@@ -957,7 +1267,6 @@ sb.auth.onAuthStateChange(async (_event, session) => {
     const session = data?.session || null;
     const user = session?.user || null;
 
-    // ✅ IMPORTANT: set globals used by getUserIdOrThrow + fetchJSON
     currentUserId = user?.id || null;
     currentAccessToken = session?.access_token || null;
 
@@ -977,4 +1286,3 @@ sb.auth.onAuthStateChange(async (_event, session) => {
     hide($("appSection"));
   }
 })();
-
