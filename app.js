@@ -206,10 +206,11 @@ $("exerciseSearch").addEventListener("input", async () => {
 async function loadTemplatesFull(userId) {
   // 1) Templates
   const tParams = new URLSearchParams();
-  tParams.set("select", "id,name,split_type,created_at");
-  tParams.set("user_id", `eq.${userId}`);
-  tParams.set("order", "created_at.desc");
-  tParams.set("limit", "200");
+tParams.set("select", "id,name,split_type,created_at");
+// ✅ shared programs: do NOT filter by user
+// tParams.set("user_id", `eq.${userId}`);
+tParams.set("order", "created_at.desc");
+tParams.set("limit", "200");
 
   const templates =
     (await fetchJSON(`/rest/v1/workout_templates?${tParams.toString()}`)) || [];
