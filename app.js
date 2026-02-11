@@ -848,16 +848,31 @@ sb.auth.onAuthStateChange(async (_event, session) => {
 
 // initial session check
 (async () => {
-  const { data } = await sb.auth.getSession();
-  const session = data.session || null;
-  const user = session?.user || null;
-  currentUserId = user?.id || null;
-  currentAccessToken = session?.access_token || null;
-  renderUserBar(user);
+  try {
+    const { data, error } = await sb.auth.getSession();
+    if (error) throw error;
 
-  if (user) {
-    hide($("authSection"));
-    show($("appSection"));
-    await refreshAll();
+    const session = data?.session || null;
+    const user = session?.user || null;
+
+    // ✅ IMPORTANT: set globals used by getUserIdOrThrow + fetchJSON
+    currentUserId = user?.id || null;
+    currentAccessToken = session?.access_token || null;
+
+    renderUserBar(user);
+
+    if (user) {
+      hide($("authSection"));
+      show($("appSection"));
+      await refreshAll();
+    } else {
+      show($("authSection"));
+      hide($("appSection"));
+    }
+  } catch (e) {
+    console.error("Initial session check failed:", e);
+    show($("authSection"));
+    hide($("appSection"));
   }
 })();
+
