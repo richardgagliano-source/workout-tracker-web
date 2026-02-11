@@ -361,7 +361,7 @@ $("exerciseSearch").addEventListener("input", async () => {
   ex.slice(0, 80).forEach((e) => {
     const card = document.createElement("div");
     card.className = "item";
-    card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} • ${e.equipment || ""}</div>`;
+    card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
     list.appendChild(card);
   });
 });
