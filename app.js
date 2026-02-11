@@ -20,6 +20,7 @@ function getUserIdOrThrow() {
 
 // --- state ---
 let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
+let cachedTemplates = []; // keep around for workout dropdown + refresh
 
 // --- helpers ---
 const $ = (id) => document.getElementById(id);
@@ -109,7 +110,7 @@ function renderUserBar(user) {
 }
 
 // ------------------------------------------------------
-// ✅ EXERCISES (Library) — public read (still via REST)
+// ✅ EXERCISES (Library) — public read (via REST)
 // ------------------------------------------------------
 async function loadExercises(search = "") {
   const term = search.trim();
@@ -229,8 +230,6 @@ async function reindexTemplate(templateId) {
   }
 }
 
-let cachedTemplates = []; // keep around for workout dropdown + refresh
-
 async function refreshTemplates() {
   const list = $("templatesList");
   list.innerHTML = "Loading...";
@@ -247,7 +246,7 @@ async function refreshTemplates() {
     return;
   }
 
-  // Workout dropdown: only templates with 5 exercises
+  // Workout dropdown now includes ALL templates
   refreshStartWorkoutDropdown();
 
   list.innerHTML = "";
@@ -268,9 +267,10 @@ async function refreshTemplates() {
     pill.textContent = t.split_type;
     h.appendChild(pill);
 
+    // ✅ no 5-limit display
     const meta = document.createElement("div");
     meta.className = "small";
-    meta.textContent = `${t.items.length}/5 exercises`;
+    meta.textContent = `${t.items.length} exercises`;
 
     const stack = document.createElement("div");
     stack.className = "stack";
@@ -328,9 +328,10 @@ async function refreshTemplates() {
       stack.appendChild(row);
     });
 
+    // ✅ always enabled; no max
     const search = document.createElement("input");
-    search.placeholder = t.items.length >= 5 ? "Template is full (5/5)" : "Search exercises to add…";
-    search.disabled = t.items.length >= 5;
+    search.placeholder = "Search exercises to add…";
+    search.disabled = false;
 
     const results = document.createElement("div");
     results.className = "stack";
@@ -351,7 +352,6 @@ async function refreshTemplates() {
           b.className = "secondary";
           b.textContent = `Add: ${e.name}`;
           b.onclick = async () => {
-            if (t.items.length >= 5) return alert("Template already has 5 exercises.");
             if (t.items.some((x) => x.exercise_id === e.id)) return alert("Already in template.");
             await addTemplateExercise(t.id, e.id, t.items.length);
             search.value = "";
@@ -402,16 +402,16 @@ function refreshStartWorkoutDropdown() {
   const sel = $("startTplSelect");
   sel.innerHTML = "";
 
-  const complete = (cachedTemplates || []).filter((t) => (t.items?.length === 5));
-  if (!complete.length) {
+  const templates = (cachedTemplates || []);
+  if (!templates.length) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "Create a template with 5 exercises first";
+    opt.textContent = "Create a template first";
     sel.appendChild(opt);
     return;
   }
 
-  complete.forEach((t) => {
+  templates.forEach((t) => {
     const opt = document.createElement("option");
     opt.value = t.id;
     opt.textContent = `${t.name} (${t.split_type})`;
@@ -452,14 +452,13 @@ function renderActiveWorkout() {
   activeWorkout.items.forEach((item, idx) => {
     const card = document.createElement("div");
     card.className = "item";
-
     const h = document.createElement("h3");
     h.textContent = `${idx + 1}. ${item.exerciseName}`;
 
     const setsBox = document.createElement("div");
     setsBox.className = "stack";
 
-    const renderSets = () => {
+    function renderSets() {
       setsBox.innerHTML = "";
       item.sets.forEach((s, si) => {
         const row = document.createElement("div");
@@ -481,16 +480,14 @@ function renderActiveWorkout() {
         del.className = "secondary";
         del.textContent = "Remove";
         del.onclick = () => {
-          item.sets = item.sets
-            .filter((_, j) => j !== si)
-            .map((x, j) => ({ ...x, set_index: j }));
+          item.sets = item.sets.filter((_, j) => j !== si).map((x, j) => ({ ...x, set_index: j }));
           renderSets();
         };
 
         row.append(w, r, del);
         setsBox.appendChild(row);
       });
-    };
+    }
 
     const addSet = document.createElement("button");
     addSet.className = "secondary";
@@ -510,11 +507,13 @@ $("startWorkoutBtn").addEventListener("click", async () => {
   setWorkoutMsg("");
 
   const templateId = $("startTplSelect").value;
-  if (!templateId) return alert("Pick a template with 5 exercises first.");
+  if (!templateId) return alert("Pick a template first.");
 
   const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
   if (!tpl) return alert("Template not found. Go to Templates tab and refresh.");
-  if (!tpl.items || tpl.items.length !== 5) return alert("Template must have exactly 5 exercises.");
+
+  // ✅ any number of exercises allowed (just not zero)
+  if (!tpl.items || tpl.items.length === 0) return alert("This template has no exercises yet.");
 
   try {
     const userId = getUserIdOrThrow();
@@ -661,7 +660,6 @@ async function refreshAll() {
     $("exerciseList").innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
 
-  // workout UI baseline
   renderActiveWorkout();
 }
 
