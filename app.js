@@ -1,6 +1,4 @@
-Anon public key
-project url
-// 1) SUPABASE CONFIG — paste your values here
+// 1) SUPABASE CONFIG
 const SUPABASE_URL = "https://doxyazdbbqpjcbfwcvzr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveHlhemRiYnFwamNiZndjdnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3ODUwODYsImV4cCI6MjA4NjM2MTA4Nn0.efJGioFAoeOzu5RnFrkKFEMz8GZRttBvMaywYnxdhyc";
 
