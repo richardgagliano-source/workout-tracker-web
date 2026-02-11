@@ -1,9 +1,9 @@
 // 1) SUPABASE CONFIG
-const SUPABASE_URL = "https://doxyazdbbqpjcbfwcvzr.sb.co";
+const SUPABASE_URL = "https://doxyazdbbqpjcbfwcvzr.sbClient.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveHlhemRiYnFwamNiZndjdnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3ODUwODYsImV4cCI6MjA4NjM2MTA4Nn0.efJGioFAoeOzu5RnFrkKFEMz8GZRttBvMaywYnxdhyc";
 
 // 2) Supabase client (from CDN)
-const sb = window.sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- UI helpers ---
 const $ = (id) => document.getElementById(id);
@@ -31,7 +31,7 @@ $("signInBtn").addEventListener("click", async () => {
   setAuthMsg("");
   const email = $("email").value.trim();
   const password = $("password").value;
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+  const { error } = await sbClient.auth.signInWithPassword({ email, password });
   if (error) setAuthMsg(error.message);
 });
 
@@ -39,13 +39,13 @@ $("signUpBtn").addEventListener("click", async () => {
   setAuthMsg("");
   const email = $("email").value.trim();
   const password = $("password").value;
-  const { error } = await sb.auth.signUp({ email, password });
+  const { error } = await sbClient.auth.signUp({ email, password });
   if (error) setAuthMsg(error.message);
   else setAuthMsg("Signed up! Now sign in.");
 });
 
 async function signOut() {
-  await sb.auth.signOut();
+  await sbClient.auth.signOut();
 }
 
 function renderUserBar(user) {
@@ -67,7 +67,7 @@ function renderUserBar(user) {
 
 // --- Data fetchers ---
 async function loadExercises(search = "") {
-  let q = sb.from("exercises")
+  let q = sbClient.from("exercises")
     .select("id,name,primary_muscle,equipment,is_system,owner_user_id")
     .order("name", { ascending: true });
 
@@ -102,11 +102,11 @@ $("createTplBtn").addEventListener("click", async () => {
   const split_type = $("tplSplit").value;
   if (!name) return;
 
-  const { data: userRes } = await sb.auth.getUser();
+  const { data: userRes } = await sbClient.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) return;
 
-  const { error } = await sb.from("workout_templates").insert({ user_id: userId, name, split_type });
+  const { error } = await sbClient.from("workout_templates").insert({ user_id: userId, name, split_type });
   if (error) alert(error.message);
   $("tplName").value = "";
   await refreshTemplates();
@@ -175,7 +175,7 @@ async function refreshTemplates() {
             return;
           }
           // insert at next order index
-          const { error } = await sb.from("workout_template_exercises").insert({
+          const { error } = await sbClient.from("workout_template_exercises").insert({
             template_id: t.id,
             exercise_id: e.id,
             order_index: existingCount
@@ -202,7 +202,7 @@ async function refreshTemplates() {
     delBtn.textContent = "Delete template";
     delBtn.onclick = async () => {
       if (!confirm("Delete this template?")) return;
-      const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
+      const { error } = await sbClient.from("workout_templates").delete().eq("id", t.id);
       if (error) alert(error.message);
       await refreshTemplates();
     };
@@ -228,7 +228,7 @@ $("startWorkoutBtn").addEventListener("click", async () => {
   if (texErr) return alert(texErr.message);
   if (!tex || tex.length !== 5) return alert("Template must have exactly 5 exercises.");
 
-  const { data: userRes } = await sb.auth.getUser();
+  const { data: userRes } = await sbClient.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) return;
 
@@ -346,7 +346,7 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
       }));
 
     if (rows.length) {
-      const { error } = await sb.from("sets").insert(rows);
+      const { error } = await sbClient.from("sets").insert(rows);
       if (error) return alert(error.message);
     }
   }
@@ -396,7 +396,7 @@ async function refreshAll() {
   $("exerciseSearch").dispatchEvent(new Event("input"));
 }
 
-sb.auth.onAuthStateChange(async (_event, session) => {
+sbClient.auth.onAuthStateChange(async (_event, session) => {
   const user = session?.user || null;
   renderUserBar(user);
   if (user) {
@@ -411,7 +411,7 @@ sb.auth.onAuthStateChange(async (_event, session) => {
 
 // initial check
 (async () => {
-  const { data } = await sb.auth.getSession();
+  const { data } = await sbClient.auth.getSession();
   const user = data.session?.user || null;
   renderUserBar(user);
   if (user) {
