@@ -1,9 +1,11 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
 // 1) SUPABASE CONFIG
 const SUPABASE_URL = "https://doxyazdbbqpjcbfwcvzr.sbClient.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRveHlhemRiYnFwamNiZndjdnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3ODUwODYsImV4cCI6MjA4NjM2MTA4Nn0.efJGioFAoeOzu5RnFrkKFEMz8GZRttBvMaywYnxdhyc";
 
 // 2) Supabase client (from CDN)
-const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sbClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- UI helpers ---
 const $ = (id) => document.getElementById(id);
