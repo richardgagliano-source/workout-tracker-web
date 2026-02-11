@@ -148,24 +148,57 @@ $("exerciseSearch").addEventListener("input", async () => {
 // Templates (user-owned)
 // --------------------
 async function loadTemplatesFull(userId) {
-  const { data, error } = await sb
-    .from("workout_templates")
-    .select(`
-      id,
-      name,
-      split_type,
-      workout_template_exercises (
-        id,
-        exercise_id,
-        order_index,
-        exercises ( id, name )
-      )
-    `)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  const { data, error } = await sb
+    .from("workout_templates")
+    .select(`
+      id,
+      name,
+      split_type,
+      created_at,
+      workout_template_exercises (
+        id,
+        template_id,
+        exercise_id,
+        order_index,
+        exercises ( id, name )
+      )
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return data || [];
+  if (error) throw error;
+
+  const templates = (data || []).map((t) => {
+    const wte = Array.isArray(t.workout_template_exercises) ? t.workout_template_exercises : [];
+
+    // stable ordering
+    wte.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    // ALSO provide a simple list used elsewhere (eg workout-start dropdown)
+    const exercises = wte.map((row) => ({
+      wte_id: row.id,                 // join row id (important!)
+      template_id: row.template_id,
+      exercise_id: row.exercise_id,
+      order_index: row.order_index,
+      name: row.exercises?.name || "(unknown exercise)",
+    }));
+
+    return {
+      id: t.id,
+      name: t.name,
+      split_type: t.split_type,
+      created_at: t.created_at,
+
+      // keep the raw nested rows for Templates tab editing (move/remove)
+      workout_template_exercises: wte,
+
+      // keep simplified list for other screens
+      exercises,
+      exercise_count: exercises.length,
+    };
+  });
+
+  return templates;
 }
 
 
@@ -385,32 +418,40 @@ for (const t of cachedTemplates) {
       const b = document.createElement("button");
       b.className = "secondary";
       b.textContent = `Add: ${exRow.name}`;
-      b.onclick = async (ev) => {
-        ev.stopPropagation();
+b.onclick = async (ev) => {
+  ev.stopPropagation();
+  const already = (t.workout_template_exercises || []).some(r => r.exercise_id === exRow.id);
+  if (already) {alert("That exercise is already in this template.");return;}
 
-        // Always compute next order_index from DB (not current.length)
-const { data: lastRow, error: lastErr } = await sb
-  .from("workout_template_exercises")
-  .select("order_index")
-  .eq("template_id", t.id)
-  .order("order_index", { ascending: false })
-  .limit(1);
+  // Compute next order_index from DB (avoid collisions & gaps)
+  const { data: lastRow, error: lastErr } = await sb
+    .from("workout_template_exercises")
+    .select("order_index")
+    .eq("template_id", t.id)
+    .order("order_index", { ascending: false })
+    .limit(1);
 
-if (lastErr) {
-  alert(lastErr.message);
-  return;
-}
+  if (lastErr) {
+    alert(lastErr.message);
+    return;
+  }
 
-const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+  const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
 
-const { error } = await sb.from("workout_template_exercises").insert({
-  template_id: t.id,
-  exercise_id: exRow.id,
-  order_index: nextIndex
-});
-        if (error) alert(error.message);
-        await refreshTemplates();
-      };
+  const { error: insErr } = await sb.from("workout_template_exercises").insert({
+    template_id: t.id,
+    exercise_id: exRow.id,
+    order_index: nextIndex,
+  });
+
+  if (insErr) {
+    alert(insErr.message);
+    return;
+  }
+
+  await refreshTemplates();
+};
+
       results.appendChild(b);
     });
   });
