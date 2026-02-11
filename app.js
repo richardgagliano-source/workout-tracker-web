@@ -267,126 +267,192 @@ async function refreshTemplates() {
     return;
   }
 
-  for (const t of cachedTemplates) {
-    const card = document.createElement("div");
-    card.className = "item";
+for (const t of cachedTemplates) {
+  const card = document.createElement("div");
+  card.className = "item";
 
-    const h = document.createElement("h3");
-    h.textContent = t.name;
-    const pill = document.createElement("span");
-    pill.className = "pill";
-    pill.textContent = t.split_type;
-    h.appendChild(pill);
+  // --- Header row (always visible) ---
+  const header = document.createElement("div");
+  header.style.display = "flex";
+  header.style.alignItems = "center";
+  header.style.justifyContent = "space-between";
+  header.style.gap = "12px";
+  header.style.cursor = "pointer";
 
-    const meta = document.createElement("div");
-    meta.className = "small";
-    meta.textContent = `${t.items.length} exercises`;
+  const left = document.createElement("div");
 
-    const stack = document.createElement("div");
-    stack.className = "stack";
+  const h = document.createElement("h3");
+  h.style.margin = "0";
+  h.textContent = t.name;
 
-    t.items.forEach((it, idx) => {
-      const row = document.createElement("div");
-      row.className = "item";
-      row.style.display = "flex";
-      row.style.alignItems = "center";
-      row.style.justifyContent = "space-between";
-      row.style.gap = "8px";
+  const pill = document.createElement("span");
+  pill.className = "pill";
+  pill.textContent = t.split_type;
 
-      const left = document.createElement("div");
-      left.innerHTML = `<b>${idx + 1}.</b> ${it.exercise_name}`;
+  // put pill next to name
+  h.appendChild(document.createTextNode(" "));
+  h.appendChild(pill);
 
-      const right = document.createElement("div");
-      right.style.display = "flex";
-      right.style.gap = "6px";
+  const meta = document.createElement("div");
+  meta.className = "small";
+  const exCount = (t.workout_template_exercises || []).length;
+  meta.textContent = `${exCount} exercise${exCount === 1 ? "" : "s"}`;
 
-      const up = document.createElement("button");
-      up.className = "secondary";
-      up.textContent = "↑";
-      up.disabled = idx === 0;
-      up.onclick = async () => {
-        const a = t.items[idx];
-        const b = t.items[idx - 1];
-        await updateTemplateExerciseOrder(a.id, b.order_index);
-        await updateTemplateExerciseOrder(b.id, a.order_index);
-        await refreshTemplates();
-      };
+  left.appendChild(h);
+  left.appendChild(meta);
 
-      const down = document.createElement("button");
-      down.className = "secondary";
-      down.textContent = "↓";
-      down.disabled = idx === t.items.length - 1;
-      down.onclick = async () => {
-        const a = t.items[idx];
-        const b = t.items[idx + 1];
-        await updateTemplateExerciseOrder(a.id, b.order_index);
-        await updateTemplateExerciseOrder(b.id, a.order_index);
-        await refreshTemplates();
-      };
+  const chevron = document.createElement("div");
+  chevron.className = "small";
+  chevron.textContent = "Show ▾";
 
-      const remove = document.createElement("button");
-      remove.className = "secondary";
-      remove.textContent = "Remove";
-      remove.onclick = async () => {
-        await deleteTemplateExercise(it.id);
-        await reindexTemplate(t.id);
-        await refreshTemplates();
-      };
+  header.appendChild(left);
+  header.appendChild(chevron);
 
-      right.append(up, down, remove);
-      row.append(left, right);
-      stack.appendChild(row);
-    });
+  // --- Details (hidden until click) ---
+  const details = document.createElement("div");
+  details.className = "stack hidden";
 
-    const search = document.createElement("input");
-    search.placeholder = "Search exercises to add…";
-    search.disabled = false;
+  const current = (t.workout_template_exercises || [])
+    .slice()
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-    const results = document.createElement("div");
-    results.className = "stack";
+  // list of exercises (with move + remove)
+  const ul = document.createElement("div");
+  ul.className = "stack";
 
-    let lastReq = 0;
-    search.addEventListener("input", async () => {
-      const term = search.value.trim();
-      results.innerHTML = "";
-      if (term.length < 2) return;
+  current.forEach((x, idx) => {
+    const row = document.createElement("div");
+    row.className = "item";
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.justifyContent = "space-between";
+    row.style.gap = "12px";
 
-      const reqId = ++lastReq;
-      try {
-        const ex = await loadExercises(term);
-        if (reqId !== lastReq) return;
+    const name = x.exercises?.name || "Exercise";
+    const leftText = document.createElement("div");
+    leftText.innerHTML = `<b>${idx + 1}.</b> ${name}`;
 
-        (ex || []).slice(0, 10).forEach((e) => {
-          const b = document.createElement("button");
-          b.className = "secondary";
-          b.textContent = `Add: ${e.name}`;
-          b.onclick = async () => {
-            if (t.items.some((x) => x.exercise_id === e.id)) return alert("Already in template.");
-            await addTemplateExercise(t.id, e.id, t.items.length);
-            search.value = "";
-            results.innerHTML = "";
-            await refreshTemplates();
-          };
-          results.appendChild(b);
-        });
-      } catch (err) {
-        console.error(err);
-        results.innerHTML = `<div class="muted">Search error: ${String(err.message || err)}</div>`;
-      }
-    });
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "8px";
 
-    const delTpl = document.createElement("button");
-    delTpl.className = "secondary";
-    delTpl.textContent = "Delete template";
-    delTpl.onclick = async () => {
-      if (!confirm("Delete this template?")) return;
-      await deleteTemplate(t.id);
+    const up = document.createElement("button");
+    up.className = "secondary";
+    up.textContent = "↑";
+    up.disabled = idx === 0;
+    up.onclick = async (e) => {
+      e.stopPropagation();
+      const above = current[idx - 1];
+      const me = x;
+      if (!above) return;
+
+      const a = above.order_index ?? (idx - 1);
+      const b = me.order_index ?? idx;
+
+      // swap order_index
+      await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
+      await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
       await refreshTemplates();
     };
 
-    card.append(h, meta, stack, search, results, delTpl);
-    list.appendChild(card);
-  }
+    const down = document.createElement("button");
+    down.className = "secondary";
+    down.textContent = "↓";
+    down.disabled = idx === current.length - 1;
+    down.onclick = async (e) => {
+      e.stopPropagation();
+      const below = current[idx + 1];
+      const me = x;
+      if (!below) return;
+
+      const a = below.order_index ?? (idx + 1);
+      const b = me.order_index ?? idx;
+
+      await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
+      await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+      await refreshTemplates();
+    };
+
+    const del = document.createElement("button");
+    del.className = "secondary";
+    del.textContent = "Remove";
+    del.onclick = async (e) => {
+      e.stopPropagation();
+      const ok = confirm("Remove this exercise from the template?");
+      if (!ok) return;
+      const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
+      if (error) alert(error.message);
+      await refreshTemplates();
+    };
+
+    actions.append(up, down, del);
+    row.append(leftText, actions);
+    ul.appendChild(row);
+  });
+
+  // search to add
+  const search = document.createElement("input");
+  search.placeholder = "Search exercises to add…";
+
+  const results = document.createElement("div");
+  results.className = "stack";
+
+  search.addEventListener("input", async (e) => {
+    e.stopPropagation();
+    const term = search.value.trim();
+    results.innerHTML = "";
+    if (term.length < 2) return;
+
+    const ex = await loadExercises(term);
+    ex.slice(0, 10).forEach((exRow) => {
+      const b = document.createElement("button");
+      b.className = "secondary";
+      b.textContent = `Add: ${exRow.name}`;
+      b.onclick = async (ev) => {
+        ev.stopPropagation();
+
+        // order_index = end of list
+        const nextIndex = current.length;
+        const { error } = await sb.from("workout_template_exercises").insert({
+          template_id: t.id,
+          exercise_id: exRow.id,
+          order_index: nextIndex
+        });
+        if (error) alert(error.message);
+        await refreshTemplates();
+      };
+      results.appendChild(b);
+    });
+  });
+
+  const delTpl = document.createElement("button");
+  delTpl.className = "secondary";
+  delTpl.textContent = "Delete template";
+  delTpl.onclick = async (e) => {
+    e.stopPropagation();
+    if (!confirm("Delete this template?")) return;
+    const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
+    if (error) alert(error.message);
+    await refreshTemplates();
+  };
+
+  details.append(ul, search, results, delTpl);
+
+  // toggle open/close
+  header.addEventListener("click", () => {
+    const isHidden = details.classList.contains("hidden");
+    if (isHidden) {
+      details.classList.remove("hidden");
+      chevron.textContent = "Hide ▴";
+    } else {
+      details.classList.add("hidden");
+      chevron.textContent = "Show ▾";
+    }
+  });
+
+  card.append(header, details);
+  list.appendChild(card);
+}
 }
 
 $("createTplBtn").addEventListener("click", async () => {
