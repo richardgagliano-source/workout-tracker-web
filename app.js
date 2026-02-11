@@ -541,11 +541,14 @@ cachedTemplates = await loadTemplatesFull(userId);
 
 $("createTplBtn").addEventListener("click", async () => {
   const name = $("tplName").value.trim();
-  const split_type = $("tplSplit").value;
   if (!name) return;
+
   try {
     const userId = getUserIdOrThrow();
-    await createTemplate(userId, name, split_type);
+
+    // You can hardcode a default, or set null.
+    await createTemplate(userId, name, null);
+
     $("tplName").value = "";
     await refreshTemplates();
   } catch (err) {
