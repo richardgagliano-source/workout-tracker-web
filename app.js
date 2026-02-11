@@ -375,4 +375,41 @@ async function refreshHistory() {
   rows.forEach((w) => {
     const card = document.createElement("div");
     card.className = "item";
-    const dt = new Date(w.performe
+    const dt = new Date(w.performed_at).toLocaleString();
+    const exCount = (w.workout_exercises || []).length;
+    card.innerHTML = `<h3>${dt}</h3><div class="small">${exCount} exercises</div>`;
+    host.appendChild(card);
+  });
+}
+
+// --- App bootstrap ---
+async function refreshAll() {
+  await refreshTemplates();
+  await refreshHistory();
+  $("exerciseSearch").dispatchEvent(new Event("input"));
+}
+
+sb.auth.onAuthStateChange(async (_event, session) => {
+  const user = session?.user || null;
+  renderUserBar(user);
+  if (user) {
+    hide($("authSection"));
+    show($("appSection"));
+    await refreshAll();
+  } else {
+    show($("authSection"));
+    hide($("appSection"));
+  }
+});
+
+// initial session check
+(async () => {
+  const { data } = await sb.auth.getSession();
+  const user = data.session?.user || null;
+  renderUserBar(user);
+  if (user) {
+    hide($("authSection"));
+    show($("appSection"));
+    await refreshAll();
+  }
+})();
