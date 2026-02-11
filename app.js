@@ -409,32 +409,35 @@ $("createTplBtn").addEventListener("click", async () => {
 async function loadLastSetsByExercise(userId, exerciseIds) {
   if (!exerciseIds.length) return new Map();
 
-  // 1) newest workout_exercise per exercise, ordered by workouts.performed_at desc
+  // 1) Fetch workout_exercises for these exercises (NO joined ordering)
   const idsStr = exerciseIds.join(",");
 
   const weParams = new URLSearchParams();
-  weParams.set("select", "id,exercise_id,workouts!inner(performed_at,user_id)");
+  weParams.set("select", "id,exercise_id,workout_id");
   weParams.set("exercise_id", `in.(${idsStr})`);
-  weParams.set("workouts.user_id", `eq.${userId}`);
-  weParams.set("order", "workouts.performed_at.desc");
-  weParams.set("limit", "1000");
+  // we can't order by joined workouts.performed_at, so we order by workout_id desc instead
+  weParams.set("order", "workout_id.desc");
+  weParams.set("limit", "2000");
 
   const weRows = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
 
+  // 2) Pick newest WE per exercise_id (because workout_id.desc returns newest-ish first)
   const latestWEByExercise = new Map(); // exercise_id -> workout_exercise_id
   for (const r of weRows) {
-    if (!latestWEByExercise.has(r.exercise_id)) latestWEByExercise.set(r.exercise_id, r.id);
+    if (!latestWEByExercise.has(r.exercise_id)) {
+      latestWEByExercise.set(r.exercise_id, r.id);
+    }
   }
 
   const weIds = [...latestWEByExercise.values()];
   if (!weIds.length) return new Map();
 
-  // 2) sets for those workout_exercise_ids
+  // 3) Fetch sets for those WEs
   const setParams = new URLSearchParams();
   setParams.set("select", "workout_exercise_id,weight,reps,set_index");
   setParams.set("workout_exercise_id", `in.(${weIds.join(",")})`);
   setParams.set("order", "workout_exercise_id.asc,set_index.asc");
-  setParams.set("limit", "2000");
+  setParams.set("limit", "5000");
 
   const setRows = (await fetchJSON(`/rest/v1/sets?${setParams.toString()}`)) || [];
 
@@ -449,6 +452,7 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
     setsByWE.set(s.workout_exercise_id, arr);
   }
 
+  // 4) Final: exercise_id -> normalized sets[]
   const out = new Map();
   for (const [exerciseId, weId] of latestWEByExercise.entries()) {
     const sets = (setsByWE.get(weId) || [])
@@ -460,6 +464,7 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
 
   return out;
 }
+
 
 // --------------------
 // Workouts: create + add exercises + save sets
