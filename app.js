@@ -26,6 +26,16 @@ const show = (el) => el.classList.remove("hidden");
 const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
+// --- Timeout helper (prevents "Loading..." forever) ---
+function withTimeout(promise, ms, label = "Operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 
 // --- REST helper (uses user JWT if available) ---
 async function fetchJSON(path, { method = "GET", body } = {}) {
@@ -280,7 +290,7 @@ async function refreshTemplates() {
   catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
 
   try {
-    cachedTemplates = await loadTemplatesFull(userId);
+cachedTemplates = await withTimeout(loadTemplatesFull(userId), 8000, "loadTemplatesFull");
   } catch (err) {
     console.error("Templates load failed:", err);
     list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
@@ -1217,13 +1227,22 @@ async function showWorkoutDetail(workoutId) {
 // Bootstrap / refreshAll
 // --------------------
 async function refreshAll() {
-  await refreshTemplates();
-  await refreshHistory();
+  // Run in parallel so one failure/hang doesn't freeze the whole app
+  const results = await Promise.allSettled([
+    refreshTemplates(),
+    refreshHistory(),
+  ]);
 
+  // If either failed, log it (you’ll see it in console)
+  results.forEach((r) => {
+    if (r.status === "rejected") console.error(r.reason);
+  });
+
+  // Library load should still happen even if templates/history fails
   try {
     const list = $("exerciseList");
     list.innerHTML = "Loading...";
-    const ex = await loadExercises("");
+    const ex = await withTimeout(loadExercises(""), 8000, "loadExercises");
     list.innerHTML = "";
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
@@ -1236,11 +1255,10 @@ async function refreshAll() {
     $("exerciseList").innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
 
-  // wire once (safe to call repeatedly)
   wireProgressSearch();
-
   renderActiveWorkout();
 }
+
 
 sb.auth.onAuthStateChange(async (_event, session) => {
   const user = session?.user || null;
