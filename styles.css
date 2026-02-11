@@ -20,3 +20,101 @@ button.tab.active { background: #111; color: #fff; }
 .item h3 { margin: 0 0 6px 0; font-size: 15px; }
 .small { font-size: 13px; color: #475467; }
 .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #f0f2f7; font-size: 12px; margin-left: 6px; }
+/* =========================
+   Dark mode (default)
+   Paste at bottom of styles.css
+   ========================= */
+
+:root {
+  --bg: #0b0f17;
+  --surface: #121a26;
+  --surface-2: #0f1622;
+  --border: rgba(255, 255, 255, 0.10);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.65);
+  --accent: #7dd3fc; /* light blue */
+}
+
+html, body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+header h1, h1, h2, h3 {
+  color: var(--text) !important;
+}
+
+.muted, .small {
+  color: var(--muted) !important;
+}
+
+/* Cards / panels */
+.card, .item, .panel {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.item {
+  background: var(--surface-2) !important;
+}
+
+/* Inputs */
+input, select, textarea {
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(255,255,255,0.45) !important;
+}
+
+/* Buttons */
+button {
+  background: rgba(255,255,255,0.10) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+
+button:hover {
+  background: rgba(255,255,255,0.14) !important;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: transparent !important;
+}
+
+/* Tabs */
+.tabs {
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.tab {
+  background: transparent !important;
+  color: var(--muted) !important;
+  border: 1px solid transparent !important;
+}
+
+.tab.active {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+
+/* Pills */
+.pill {
+  background: rgba(125, 211, 252, 0.12) !important;
+  color: var(--accent) !important;
+  border: 1px solid rgba(125, 211, 252, 0.25) !important;
+}
+
+/* Links (if any) */
+a {
+  color: var(--accent) !important;
+}
