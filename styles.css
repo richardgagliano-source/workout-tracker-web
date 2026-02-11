@@ -118,3 +118,19 @@ button.secondary {
 a {
   color: var(--accent) !important;
 }
+/* Force the outer page background (top area + margins) */
+html, body {
+  background: #0b0f17 !important;
+  color: rgba(255,255,255,0.92) !important;
+  min-height: 100%;
+}
+
+/* If you have a page wrapper, keep it transparent so body shows through */
+#appSection, #authSection, main, .container, .wrap {
+  background: transparent !important;
+}
+/* Top header area */
+header, #userBar, .topbar {
+  background: transparent !important;
+  color: rgba(255,255,255,0.92) !important;
+}
