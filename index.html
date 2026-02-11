@@ -6,6 +6,7 @@
     <title>Workout Tracker</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
+
   <body>
     <header>
       <h1>Workout Tracker</h1>
@@ -50,7 +51,7 @@
           </div>
 
           <div id="templatesList" class="stack"></div>
-          <p class="muted">Add as many exercises as you want.</b>.</p>
+          <!-- removed the “exactly 5 exercises” note since templates can be any length -->
         </div>
 
         <!-- Workout -->
@@ -76,6 +77,11 @@
         <!-- History -->
         <div class="panel hidden" id="tab-history">
           <h2>History</h2>
+
+          <!-- ✅ NEW: detail container shown when you click a workout -->
+          <div id="historyDetail" class="stack hidden"></div>
+
+          <!-- existing list -->
           <div id="historyList" class="stack"></div>
         </div>
       </section>
