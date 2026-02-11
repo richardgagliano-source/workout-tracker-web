@@ -264,13 +264,17 @@ async function refreshTemplates() {
   try { userId = getUserIdOrThrow(); }
   catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
 
-  try {
-    cachedTemplates = await loadTemplatesFull(userId);
-  } catch (err) {
-    console.error(err);
-    list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
-    return;
-  }
+try {
+  cachedTemplates = await Promise.race([
+    loadTemplatesFull(userId),
+    new Promise((_, rej) => setTimeout(() => rej(new Error("loadTemplatesFull timed out")), 8000)),
+  ]);
+} catch (err) {
+  console.error("Templates load failed:", err);
+  list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
+  return;
+}
+
 
   refreshStartWorkoutDropdown();
 
