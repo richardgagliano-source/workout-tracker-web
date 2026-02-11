@@ -689,6 +689,97 @@ async function refreshHistory() {
     host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
   }
 }
+function fmtSet(s) {
+  const w = s.weight == null ? "—" : s.weight;
+  const r = s.reps == null ? "—" : s.reps;
+  return `${w} × ${r}`;
+}
+
+async function loadWorkoutDetail(workoutId) {
+  // Pull workout + exercises + sets (then we’ll sort/group in JS)
+  const { data, error } = await sb
+    .from("workouts")
+    .select(`
+      id,
+      performed_at,
+      notes,
+      workout_exercises (
+        id,
+        order_index,
+        exercises ( id, name ),
+        sets ( set_index, weight, reps )
+      )
+    `)
+    .eq("id", workoutId)
+    .single();
+
+  if (error) throw error;
+
+  // Normalize ordering
+  const wes = (data.workout_exercises || [])
+    .slice()
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((we) => ({
+      ...we,
+      sets: (we.sets || []).slice().sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0)),
+    }));
+
+  return { ...data, workout_exercises: wes };
+}
+
+async function showWorkoutDetail(workoutId) {
+  const detail = $("historyDetail");
+  const list = $("historyList");
+
+  detail.classList.remove("hidden");
+  list.classList.add("hidden");
+  detail.innerHTML = "Loading...";
+
+  const w = await loadWorkoutDetail(workoutId);
+
+  const wrap = document.createElement("div");
+  wrap.className = "item";
+
+  const header = document.createElement("div");
+  header.className = "row";
+  header.style.justifyContent = "space-between";
+  header.style.alignItems = "center";
+
+  const title = document.createElement("h3");
+  title.textContent = new Date(w.performed_at).toLocaleString();
+
+  const back = document.createElement("button");
+  back.className = "secondary";
+  back.textContent = "Back";
+  back.onclick = () => {
+    detail.classList.add("hidden");
+    list.classList.remove("hidden");
+    detail.innerHTML = "";
+  };
+
+  header.append(title, back);
+  wrap.appendChild(header);
+
+  (w.workout_exercises || []).forEach((we, i) => {
+    const ex = document.createElement("div");
+    ex.className = "item";
+
+    const name = we.exercises?.name || "Exercise";
+    const sets = we.sets || [];
+
+    ex.innerHTML = `
+      <div><b>${i + 1}. ${name}</b></div>
+      <div class="small">
+        ${sets.length ? sets.map((s, idx) => `Set ${idx + 1}: ${fmtSet(s)}`).join("<br/>") : "No sets saved"}
+      </div>
+    `;
+
+    wrap.appendChild(ex);
+  });
+
+  detail.innerHTML = "";
+  detail.appendChild(wrap);
+}
 
 // --------------------
 // Bootstrap / refreshAll
