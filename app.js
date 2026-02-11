@@ -10,6 +10,13 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window.sb = sb;
 console.log("sb ready", !!window.sb);
 
+// ✅ Store current user id from session (avoid sb.auth.getUser() hangs)
+let currentUserId = null;
+function getUserIdOrThrow() {
+  if (!currentUserId) throw new Error("Not signed in.");
+  return currentUserId;
+}
+
 // --- helpers ---
 const $ = (id) => document.getElementById(id);
 const show = (el) => el.classList.remove("hidden");
@@ -128,32 +135,17 @@ $("exerciseSearch").addEventListener("input", async () => {
 });
 
 // ----------------------------
-// ✅ Templates (fetch) — fixed
-// Tables expected:
-// - workout_templates (id, user_id, name, split_type, created_at)
-// - workout_template_exercises (id, template_id, exercise_id, order_index)
-// - exercises (id, name)
+// ✅ Templates (fetch)
 // ----------------------------
-async function getUserIdOrThrow() {
-  const { data, error } = await sb.auth.getUser();
-  if (error) throw error;
-  const userId = data.user?.id;
-  if (!userId) throw new Error("Not signed in.");
-  return userId;
-}
-
 async function loadTemplatesFull(userId) {
-  // Get templates for this user
   const tParams = new URLSearchParams();
   tParams.set("select", "id,name,split_type,created_at");
   tParams.set("user_id", `eq.${userId}`);
   tParams.set("order", "created_at.desc");
 
   const templates = await fetchJSON(`/rest/v1/workout_templates?${tParams.toString()}`) || [];
-
   if (templates.length === 0) return [];
 
-  // Get template exercises (for all template ids)
   const ids = templates.map((t) => t.id).join(",");
   const teParams = new URLSearchParams();
   teParams.set("select", "id,template_id,exercise_id,order_index");
@@ -162,7 +154,6 @@ async function loadTemplatesFull(userId) {
 
   const tex = await fetchJSON(`/rest/v1/workout_template_exercises?${teParams.toString()}`) || [];
 
-  // Get exercise names for all involved exercise_ids
   const exIds = [...new Set(tex.map((r) => r.exercise_id))];
   let exMap = new Map();
   if (exIds.length) {
@@ -173,7 +164,6 @@ async function loadTemplatesFull(userId) {
     exMap = new Map(exRows.map((e) => [e.id, e.name]));
   }
 
-  // Attach
   const byTemplate = new Map();
   tex.forEach((r) => {
     const arr = byTemplate.get(r.template_id) || [];
@@ -236,8 +226,8 @@ async function refreshTemplates() {
 
   let userId;
   try {
-    userId = await getUserIdOrThrow();
-  } catch (err) {
+    userId = getUserIdOrThrow();
+  } catch (_err) {
     list.innerHTML = `<div class="muted">Not signed in.</div>`;
     return;
   }
@@ -251,7 +241,6 @@ async function refreshTemplates() {
     return;
   }
 
-  // Start dropdown: only full templates
   const sel = $("startTplSelect");
   sel.innerHTML = "";
   templates.filter((t) => (t.items?.length === 5)).forEach((t) => {
@@ -393,7 +382,7 @@ $("createTplBtn").addEventListener("click", async () => {
   if (!name) return;
 
   try {
-    const userId = await getUserIdOrThrow();
+    const userId = getUserIdOrThrow();
     await createTemplate(userId, name, split_type);
     $("tplName").value = "";
     await refreshTemplates();
@@ -435,7 +424,9 @@ async function refreshAll() {
 
 sb.auth.onAuthStateChange(async (_event, session) => {
   const user = session?.user || null;
+  currentUserId = user?.id || null; // ✅ store id here
   renderUserBar(user);
+
   if (user) {
     hide($("authSection"));
     show($("appSection"));
@@ -449,7 +440,9 @@ sb.auth.onAuthStateChange(async (_event, session) => {
 (async () => {
   const { data } = await sb.auth.getSession();
   const user = data.session?.user || null;
+  currentUserId = user?.id || null; // ✅ store id here
   renderUserBar(user);
+
   if (user) {
     hide($("authSection"));
     show($("appSection"));
