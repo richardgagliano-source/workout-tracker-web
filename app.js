@@ -506,10 +506,10 @@ cachedTemplates = await loadTemplatesFull(userId);
 
     const delTpl = document.createElement("button");
     delTpl.className = "secondary";
-    delTpl.textContent = "Delete template";
+    delTpl.textContent = "Delete program";
     delTpl.onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm("Delete this template?")) return;
+      if (!confirm("Delete this Program, bb?")) return;
       const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
       if (error) alert(error.message);
       await refreshTemplates();
