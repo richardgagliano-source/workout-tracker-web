@@ -355,12 +355,6 @@ cachedTemplates = await loadTemplatesFull(userId);
     h.style.margin = "0";
     h.textContent = t.name;
 
-    const pill = document.createElement("span");
-    pill.className = "pill";
-    pill.textContent = t.split_type;
-
-    h.appendChild(document.createTextNode(" "));
-    h.appendChild(pill);
 
     const meta = document.createElement("div");
     meta.className = "small";
