@@ -1,86 +1,35 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Workout Tracker</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <header>
-      <h1>Workout Tracker</h1>
-      <div id="userBar" class="row"></div>
-    </header>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workout Tracker</title>
+  <style>
+    body { font-family: system-ui; background:#f4f4f4; padding:20px; }
+    .card { background:white; padding:20px; border-radius:12px; max-width:400px; margin:auto; }
+    input { width:100%; padding:10px; margin:6px 0; border-radius:8px; border:1px solid #ddd; }
+    button { padding:10px 14px; border-radius:8px; border:none; background:black; color:white; cursor:pointer; margin-top:6px; }
+    .secondary { background:#ddd; color:black; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
 
-    <main>
-      <!-- AUTH -->
-      <section id="authSection" class="card">
-        <h2>Sign in</h2>
-        <div class="grid">
-          <input id="email" type="email" placeholder="Email" autocomplete="email" />
-          <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
-        </div>
-        <div class="row">
-          <button id="signInBtn">Sign in</button>
-          <button id="signUpBtn" class="secondary">Sign up</button>
-        </div>
-        <p class="muted" id="authMsg"></p>
-      </section>
+  <div class="card" id="authCard">
+    <h2>Workout Tracker</h2>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="signUpBtn">Sign Up</button>
+    <button id="signInBtn" class="secondary">Sign In</button>
+    <p id="message"></p>
+  </div>
 
-      <!-- APP -->
-      <section id="appSection" class="card hidden">
-        <div class="tabs">
-          <button class="tab active" data-tab="templates">Templates</button>
-          <button class="tab" data-tab="workout">Workout</button>
-          <button class="tab" data-tab="library">Library</button>
-          <button class="tab" data-tab="history">History</button>
-        </div>
+  <div class="card hidden" id="appCard">
+    <h2>You are logged in ✅</h2>
+    <button id="logoutBtn">Logout</button>
+  </div>
 
-        <!-- Templates -->
-        <div class="panel" id="tab-templates">
-          <h2>Templates (Push / Pull)</h2>
+  <script type="module" src="./app.js"></script>
 
-          <div class="row">
-            <input id="tplName" placeholder="Template name (e.g., Push A)" />
-            <select id="tplSplit">
-              <option value="push">push</option>
-              <option value="pull">pull</option>
-            </select>
-            <button id="createTplBtn">Create</button>
-          </div>
-
-          <div id="templatesList" class="stack"></div>
-          <p class="muted">Each template must have exactly <b>5 exercises</b>.</p>
-        </div>
-
-        <!-- Workout -->
-        <div class="panel hidden" id="tab-workout">
-          <h2>Start workout</h2>
-          <div class="row">
-            <select id="startTplSelect"></select>
-            <button id="startWorkoutBtn">Start</button>
-          </div>
-
-          <div id="activeWorkout" class="stack"></div>
-          <button id="saveWorkoutBtn" class="hidden">Save workout</button>
-          <p class="muted" id="workoutMsg"></p>
-        </div>
-
-        <!-- Library -->
-        <div class="panel hidden" id="tab-library">
-          <h2>Exercise library</h2>
-          <input id="exerciseSearch" placeholder="Search exercises..." />
-          <div id="exerciseList" class="stack"></div>
-        </div>
-
-        <!-- History -->
-        <div class="panel hidden" id="tab-history">
-          <h2>History</h2>
-          <div id="historyList" class="stack"></div>
-        </div>
-      </section>
-    </main>
-
-<script type="module" src="./app.js"></script>
-  </body>
+</body>
 </html>
