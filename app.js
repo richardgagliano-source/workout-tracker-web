@@ -9,7 +9,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window.sb = sb;
 console.log("sb ready", !!window.sb);
 
-// ✅ store user/session (avoid sb.auth.getUser() + use JWT for RLS tables)
+// ✅ store session info (avoid getUser() hangs + use JWT for RLS)
 let currentUserId = null;
 let currentAccessToken = null;
 
@@ -18,6 +18,9 @@ function getUserIdOrThrow() {
   return currentUserId;
 }
 
+// --- state ---
+let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
+
 // --- helpers ---
 const $ = (id) => document.getElementById(id);
 const show = (el) => el.classList.remove("hidden");
@@ -25,14 +28,9 @@ const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
 
-/**
- * ✅ fetch helper
- * - always includes apikey
- * - uses *user JWT* if available (critical for RLS tables like workout_templates)
- */
 async function fetchJSON(path, { method = "GET", body } = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timer = setTimeout(() => controller.abort(), 10000);
 
   const authToken = currentAccessToken || SUPABASE_ANON_KEY;
 
@@ -110,9 +108,9 @@ function renderUserBar(user) {
   el.append(span, btn);
 }
 
-// ----------------------------
-// ✅ Library (fetch) — works
-// ----------------------------
+// ------------------------------------------------------
+// ✅ EXERCISES (Library) — public read (still via REST)
+// ------------------------------------------------------
 async function loadExercises(search = "") {
   const term = search.trim();
   const params = new URLSearchParams();
@@ -123,6 +121,7 @@ async function loadExercises(search = "") {
   return await fetchJSON(`/rest/v1/exercises?${params.toString()}`);
 }
 
+// --- Library UI ---
 $("exerciseSearch").addEventListener("input", async () => {
   const term = $("exerciseSearch").value.trim();
   const list = $("exerciseList");
@@ -143,9 +142,9 @@ $("exerciseSearch").addEventListener("input", async () => {
   }
 });
 
-// ----------------------------
-// ✅ Templates (fetch + USER JWT)
-// ----------------------------
+// ------------------------------------------------------
+// ✅ TEMPLATES (read/write user-owned via RLS)
+// ------------------------------------------------------
 async function loadTemplatesFull(userId) {
   const tParams = new URLSearchParams();
   tParams.set("select", "id,name,split_type,created_at");
@@ -166,7 +165,6 @@ async function loadTemplatesFull(userId) {
 
   const exIds = [...new Set(tex.map((r) => r.exercise_id))];
   let exMap = new Map();
-
   if (exIds.length) {
     const exParams = new URLSearchParams();
     exParams.set("select", "id,name");
@@ -231,39 +229,34 @@ async function reindexTemplate(templateId) {
   }
 }
 
+let cachedTemplates = []; // keep around for workout dropdown + refresh
+
 async function refreshTemplates() {
   const list = $("templatesList");
   list.innerHTML = "Loading...";
 
   let userId;
-  try {
-    userId = getUserIdOrThrow();
-  } catch {
-    list.innerHTML = `<div class="muted">Not signed in.</div>`;
-    return;
-  }
+  try { userId = getUserIdOrThrow(); }
+  catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
 
-  let templates = [];
   try {
-    templates = await loadTemplatesFull(userId);
+    cachedTemplates = await loadTemplatesFull(userId);
   } catch (err) {
     console.error(err);
     list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
     return;
   }
 
-  // Start dropdown: only templates with 5 items
-  const sel = $("startTplSelect");
-  sel.innerHTML = "";
-  templates.filter((t) => (t.items?.length === 5)).forEach((t) => {
-    const opt = document.createElement("option");
-    opt.value = t.id;
-    opt.textContent = `${t.name} (${t.split_type})`;
-    sel.appendChild(opt);
-  });
+  // Workout dropdown: only templates with 5 exercises
+  refreshStartWorkoutDropdown();
 
   list.innerHTML = "";
-  for (const t of templates) {
+  if (!cachedTemplates.length) {
+    list.innerHTML = `<div class="muted">No templates yet. Create one above.</div>`;
+    return;
+  }
+
+  for (const t of cachedTemplates) {
     const card = document.createElement("div");
     card.className = "item";
 
@@ -402,12 +395,248 @@ $("createTplBtn").addEventListener("click", async () => {
   }
 });
 
-// --- Workout + History placeholders (next) ---
+// ------------------------------------------------------
+// ✅ WORKOUTS (start from template, add sets, save)
+// ------------------------------------------------------
+function refreshStartWorkoutDropdown() {
+  const sel = $("startTplSelect");
+  sel.innerHTML = "";
+
+  const complete = (cachedTemplates || []).filter((t) => (t.items?.length === 5));
+  if (!complete.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Create a template with 5 exercises first";
+    sel.appendChild(opt);
+    return;
+  }
+
+  complete.forEach((t) => {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = `${t.name} (${t.split_type})`;
+    sel.appendChild(opt);
+  });
+}
+
+async function createWorkout(userId) {
+  const body = [{ user_id: userId, performed_at: new Date().toISOString(), notes: null }];
+  const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
+  return created?.[0];
+}
+
+async function createWorkoutExercises(workoutId, templateItems) {
+  const body = templateItems.map((it) => ({
+    workout_id: workoutId,
+    exercise_id: it.exercise_id,
+    order_index: it.order_index,
+  }));
+  const created = await fetchJSON(`/rest/v1/workout_exercises`, { method: "POST", body });
+  return created || [];
+}
+
+async function insertSets(rows) {
+  if (!rows.length) return;
+  await fetchJSON(`/rest/v1/sets`, { method: "POST", body: rows });
+}
+
+function renderActiveWorkout() {
+  const host = $("activeWorkout");
+  host.innerHTML = "";
+
+  if (!activeWorkout) {
+    host.innerHTML = `<div class="muted">No active workout. Choose a template and press Start.</div>`;
+    return;
+  }
+
+  activeWorkout.items.forEach((item, idx) => {
+    const card = document.createElement("div");
+    card.className = "item";
+
+    const h = document.createElement("h3");
+    h.textContent = `${idx + 1}. ${item.exerciseName}`;
+
+    const setsBox = document.createElement("div");
+    setsBox.className = "stack";
+
+    const renderSets = () => {
+      setsBox.innerHTML = "";
+      item.sets.forEach((s, si) => {
+        const row = document.createElement("div");
+        row.className = "row";
+
+        const w = document.createElement("input");
+        w.placeholder = "weight";
+        w.inputMode = "decimal";
+        w.value = s.weight;
+        w.oninput = () => (s.weight = w.value);
+
+        const r = document.createElement("input");
+        r.placeholder = "reps";
+        r.inputMode = "numeric";
+        r.value = s.reps;
+        r.oninput = () => (s.reps = r.value);
+
+        const del = document.createElement("button");
+        del.className = "secondary";
+        del.textContent = "Remove";
+        del.onclick = () => {
+          item.sets = item.sets
+            .filter((_, j) => j !== si)
+            .map((x, j) => ({ ...x, set_index: j }));
+          renderSets();
+        };
+
+        row.append(w, r, del);
+        setsBox.appendChild(row);
+      });
+    };
+
+    const addSet = document.createElement("button");
+    addSet.className = "secondary";
+    addSet.textContent = "Add set";
+    addSet.onclick = () => {
+      item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
+      renderSets();
+    };
+
+    renderSets();
+    card.append(h, setsBox, addSet);
+    host.appendChild(card);
+  });
+}
+
 $("startWorkoutBtn").addEventListener("click", async () => {
-  setWorkoutMsg("Next step: wire workout logging after templates ✅");
+  setWorkoutMsg("");
+
+  const templateId = $("startTplSelect").value;
+  if (!templateId) return alert("Pick a template with 5 exercises first.");
+
+  const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
+  if (!tpl) return alert("Template not found. Go to Templates tab and refresh.");
+  if (!tpl.items || tpl.items.length !== 5) return alert("Template must have exactly 5 exercises.");
+
+  try {
+    const userId = getUserIdOrThrow();
+
+    const workout = await createWorkout(userId);
+    if (!workout?.id) throw new Error("Failed to create workout.");
+
+    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
+
+    // map exercise_id -> name from template (already known)
+    const nameByExerciseId = new Map(tpl.items.map((it) => [it.exercise_id, it.exercise_name]));
+
+    activeWorkout = {
+      workoutId: workout.id,
+      items: (weInserted || [])
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((we) => ({
+          workoutExerciseId: we.id,
+          exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+          sets: [{ set_index: 0, weight: "", reps: "" }],
+        })),
+    };
+
+    renderActiveWorkout();
+    show($("saveWorkoutBtn"));
+    setWorkoutMsg("Workout started. Enter sets, then Save.");
+  } catch (err) {
+    console.error(err);
+    alert(String(err.message || err));
+  }
 });
+
+$("saveWorkoutBtn").addEventListener("click", async () => {
+  if (!activeWorkout) return;
+
+  try {
+    const rows = [];
+    for (const item of activeWorkout.items) {
+      for (const s of item.sets) {
+        const hasAny = String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
+        if (!hasAny) continue;
+
+        rows.push({
+          workout_exercise_id: item.workoutExerciseId,
+          set_index: s.set_index,
+          weight: String(s.weight).trim() === "" ? null : Number(s.weight),
+          reps: String(s.reps).trim() === "" ? null : Number(s.reps),
+          is_warmup: false,
+        });
+      }
+    }
+
+    await insertSets(rows);
+
+    setWorkoutMsg("Saved ✅");
+    activeWorkout = null;
+    hide($("saveWorkoutBtn"));
+    renderActiveWorkout();
+    await refreshHistory();
+  } catch (err) {
+    console.error(err);
+    alert(String(err.message || err));
+  }
+});
+
+// ------------------------------------------------------
+// ✅ HISTORY (last 20 workouts + exercise count)
+// ------------------------------------------------------
+async function loadHistory(userId) {
+  const params = new URLSearchParams();
+  params.set("select", "id,performed_at,notes");
+  params.set("user_id", `eq.${userId}`);
+  params.set("order", "performed_at.desc");
+  params.set("limit", "20");
+
+  const workouts = await fetchJSON(`/rest/v1/workouts?${params.toString()}`) || [];
+  if (!workouts.length) return [];
+
+  const ids = workouts.map((w) => w.id).join(",");
+
+  // count workout_exercises per workout
+  const weParams = new URLSearchParams();
+  weParams.set("select", "workout_id");
+  weParams.set("workout_id", `in.(${ids})`);
+  const wes = await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`) || [];
+
+  const counts = new Map();
+  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
+
+  return workouts.map((w) => ({
+    ...w,
+    exercise_count: counts.get(w.id) || 0,
+  }));
+}
+
 async function refreshHistory() {
-  $("historyList").innerHTML = `<div class="muted">History enabled after workout logging ✅</div>`;
+  const host = $("historyList");
+  host.innerHTML = "Loading...";
+
+  let userId;
+  try { userId = getUserIdOrThrow(); }
+  catch { host.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
+
+  try {
+    const rows = await loadHistory(userId);
+    host.innerHTML = "";
+    if (!rows.length) {
+      host.innerHTML = `<div class="muted">No workouts yet. Start one in the Workout tab.</div>`;
+      return;
+    }
+
+    rows.forEach((w) => {
+      const card = document.createElement("div");
+      card.className = "item";
+      const dt = new Date(w.performed_at).toLocaleString();
+      card.innerHTML = `<h3>${dt}</h3><div class="small">${w.exercise_count} exercises</div>`;
+      host.appendChild(card);
+    });
+  } catch (err) {
+    console.error(err);
+    host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
+  }
 }
 
 // --- Bootstrap ---
@@ -415,6 +644,7 @@ async function refreshAll() {
   await refreshTemplates();
   await refreshHistory();
 
+  // load initial library list
   try {
     const list = $("exerciseList");
     list.innerHTML = "Loading...";
@@ -430,12 +660,15 @@ async function refreshAll() {
     console.error(err);
     $("exerciseList").innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
+
+  // workout UI baseline
+  renderActiveWorkout();
 }
 
 sb.auth.onAuthStateChange(async (_event, session) => {
   const user = session?.user || null;
   currentUserId = user?.id || null;
-  currentAccessToken = session?.access_token || null; // ✅ critical for RLS fetches
+  currentAccessToken = session?.access_token || null;
   renderUserBar(user);
 
   if (user) {
@@ -453,7 +686,7 @@ sb.auth.onAuthStateChange(async (_event, session) => {
   const session = data.session || null;
   const user = session?.user || null;
   currentUserId = user?.id || null;
-  currentAccessToken = session?.access_token || null; // ✅ critical for RLS fetches
+  currentAccessToken = session?.access_token || null;
   renderUserBar(user);
 
   if (user) {
