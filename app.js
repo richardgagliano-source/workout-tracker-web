@@ -333,7 +333,7 @@ cachedTemplates = await loadTemplatesFull(userId);
 
   list.innerHTML = "";
   if (!cachedTemplates.length) {
-    list.innerHTML = `<div class="muted">No templates yet. Create one above.</div>`;
+    list.innerHTML = `<div class="muted">No programs yet. Add one, bb!.</div>`;
     return;
   }
 
