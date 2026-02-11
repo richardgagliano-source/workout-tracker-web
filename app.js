@@ -148,57 +148,60 @@ $("exerciseSearch").addEventListener("input", async () => {
 // Templates (user-owned)
 // --------------------
 async function loadTemplatesFull(userId) {
-  const { data, error } = await sb
-    .from("workout_templates")
-    .select(`
-      id,
-      name,
-      split_type,
-      created_at,
-      workout_template_exercises (
-        id,
-        template_id,
-        exercise_id,
-        order_index,
-        exercises ( id, name )
-      )
-    `)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  const { data, error } = await sb
+    .from("workout_templates")
+    .select(`
+      id,
+      name,
+      split_type,
+      created_at,
+      workout_template_exercises (
+        id,
+        template_id,
+        exercise_id,
+        order_index,
+        exercises ( id, name )
+      )
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) throw error;
 
-  const templates = (data || []).map((t) => {
-    const wte = Array.isArray(t.workout_template_exercises) ? t.workout_template_exercises : [];
+  return (data || []).map((t) => {
+    const wte = Array.isArray(t.workout_template_exercises) ? t.workout_template_exercises : [];
+    wte.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-    // stable ordering
-    wte.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    // simplified list
+    const exercises = wte.map((row) => ({
+      wte_id: row.id,
+      template_id: row.template_id,
+      exercise_id: row.exercise_id,
+      order_index: row.order_index,
+      name: row.exercises?.name || "(unknown exercise)",
+    }));
 
-    // ALSO provide a simple list used elsewhere (eg workout-start dropdown)
-    const exercises = wte.map((row) => ({
-      wte_id: row.id,                 // join row id (important!)
-      template_id: row.template_id,
-      exercise_id: row.exercise_id,
-      order_index: row.order_index,
-      name: row.exercises?.name || "(unknown exercise)",
-    }));
+    // ✅ Backward compat: what your Workout tab expects
+    const items = exercises.map((e) => ({
+      exercise_id: e.exercise_id,
+      order_index: e.order_index,
+      exercise_name: e.name,
+    }));
 
-    return {
-      id: t.id,
-      name: t.name,
-      split_type: t.split_type,
-      created_at: t.created_at,
+    return {
+      id: t.id,
+      name: t.name,
+      split_type: t.split_type,
+      created_at: t.created_at,
 
-      // keep the raw nested rows for Templates tab editing (move/remove)
-      workout_template_exercises: wte,
+      workout_template_exercises: wte,
+      exercises,
+      exercise_count: exercises.length,
 
-      // keep simplified list for other screens
-      exercises,
-      exercise_count: exercises.length,
-    };
-  });
-
-  return templates;
+      // ✅ important for Workout tab
+      items,
+    };
+  });
 }
 
 
@@ -420,7 +423,7 @@ for (const t of cachedTemplates) {
       b.textContent = `Add: ${exRow.name}`;
 b.onclick = async (ev) => {
   ev.stopPropagation();
-  const already = (t.workout_template_exercises || []).some(r => r.exercise_id === exRow.id);
+const already = current.some(r => r.exercise_id === exRow.id);
   if (already) {alert("That exercise is already in this template.");return;}
 
   // Compute next order_index from DB (avoid collisions & gaps)
