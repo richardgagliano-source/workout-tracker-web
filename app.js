@@ -74,18 +74,33 @@ function renderUserBar(user) {
 
 // --- Data fetchers ---
 async function loadExercises(search = "") {
-  let q = sb.from("exercises")
-    .select("id,name,primary_muscle,equipment,is_system,owner_user_id")
-    .order("name", { ascending: true });
+  const term = search.trim();
 
-  if (search.trim()) q = q.ilike("name", `%${search.trim()}%`);
+  // Build a PostgREST URL (this is what supabase-js calls under the hood)
+  const params = new URLSearchParams();
+  params.set("select", "id,name,primary_muscle,equipment,is_system,owner_user_id");
+  params.set("order", "name.asc");
+  params.set("limit", "80");
 
-  const { data, error } = await q;
-  if (error) {
-    console.error("Supabase exercises error:", error);
-    throw error;
+  // PostgREST filter: name=ilike.*bench*
+  if (term) params.set("name", `ilike.*${term.replaceAll("*", "")}*`);
+
+  const url = `${SUPABASE_URL}/rest/v1/exercises?${params.toString()}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Exercises fetch failed (${res.status}): ${text}`);
   }
-  return data || [];
+
+  return await res.json();
 }
 
 async function loadTemplates() {
