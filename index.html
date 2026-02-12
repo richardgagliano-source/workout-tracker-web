@@ -150,5 +150,38 @@
     </script>
 
     <script type="module" src="./app.js"></script>
+    <script>
+  (function () {
+    function setOpen(open) {
+      const menu = document.getElementById("userMenu");
+      const btn = document.getElementById("menuBtn");
+      if (!menu || !btn) return;
+      menu.classList.toggle("open", open);
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    // Toggle when clicking hamburger (event delegation)
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("#menuBtn");
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const menu = document.getElementById("userMenu");
+        const isOpen = menu?.classList.contains("open");
+        setOpen(!isOpen);
+        return;
+      }
+
+      // Click outside closes it
+      const menu = document.getElementById("userMenu");
+      if (menu && !menu.contains(e.target)) setOpen(false);
+    });
+
+    // Escape closes it
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") setOpen(false);
+    });
+  })();
+</script>
   </body>
 </html>
