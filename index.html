@@ -14,7 +14,23 @@
         <div class="subtitle">for our healthy life</div>
       </div>
 
-      <div id="userBar"></div>
+      <!-- Hamburger menu (top-right) -->
+      <div class="menu" id="userMenu">
+        <button
+          class="menu-btn"
+          id="menuBtn"
+          type="button"
+          aria-label="Open menu"
+          aria-expanded="false"
+        >
+          ☰
+        </button>
+
+        <div class="menu-panel" id="menuPanel">
+          <!-- app.js will still render “Signed in as…” + “Sign out” into this -->
+          <div id="userBar"></div>
+        </div>
+      </div>
     </header>
 
     <main>
@@ -107,6 +123,33 @@
         </div>
       </section>
     </main>
+
+    <!-- Small menu toggler (independent of app.js) -->
+    <script>
+      (function () {
+        const menu = document.getElementById("userMenu");
+        const btn = document.getElementById("menuBtn");
+
+        function closeMenu() {
+          menu.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+        }
+
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isOpen = menu.classList.toggle("open");
+          btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+
+        document.addEventListener("click", (e) => {
+          if (!menu.contains(e.target)) closeMenu();
+        });
+
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") closeMenu();
+        });
+      })();
+    </script>
 
     <script type="module" src="./app.js"></script>
   </body>
