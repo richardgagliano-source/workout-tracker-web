@@ -221,8 +221,6 @@ $("exerciseSearch").addEventListener("input", async () => {
       list.appendChild(renderExerciseCard(e));
     });
 
-      list.appendChild(card);
-    });
 
     if (!ex || ex.length === 0) {
       list.innerHTML = `<div class="muted">No exercises found.</div>`;
