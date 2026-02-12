@@ -1,31 +1,11 @@
-:root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-body { margin: 0; background: #f6f7f9; color: #111; }
-header { padding: 16px; background: white; border-bottom: 1px solid #e6e8ee; position: sticky; top: 0; }
-h1 { margin: 0 0 8px 0; font-size: 18px; }
-main { padding: 16px; max-width: 920px; margin: 0 auto; }
-.card { background: white; border: 1px solid #e6e8ee; border-radius: 12px; padding: 16px; }
-.hidden { display: none !important; }
-.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 10px 0; }
-.stack { display: grid; gap: 10px; margin-top: 12px; }
-input, select { padding: 10px; border: 1px solid #d7dbe6; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
-input { width: 100%; }
-select { min-width: 120px; }
-button { padding: 10px 12px; border: 0; border-radius: 10px; background: #111; color: white; font-size: 14px; cursor: pointer; }
-button.secondary { background: #e9ecf3; color: #111; }
-button.tab { background: #e9ecf3; color: #111; }
-button.tab.active { background: #111; color: #fff; }
-.muted { color: #667085; font-size: 13px; }
-.item { border: 1px solid #e6e8ee; border-radius: 12px; padding: 12px; }
-.item h3 { margin: 0 0 6px 0; font-size: 15px; }
-.small { font-size: 13px; color: #475467; }
-.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #f0f2f7; font-size: 12px; margin-left: 6px; }
-/* =========================
-   Dark mode (default)
-   Paste at bottom of styles.css
-   ========================= */
+/* ==========================================================
+   BASE
+   ========================================================== */
 
 :root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+
+  /* Dark theme tokens */
   --bg: #0b0f17;
   --surface: #121a26;
   --surface-2: #0f1622;
@@ -36,49 +16,77 @@ button.tab.active { background: #111; color: #fff; }
 }
 
 html, body {
-  background: var(--bg) !important;
-  color: var(--text) !important;
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
 }
 
-header h1, h1, h2, h3 {
-  color: var(--text) !important;
+.hidden { display: none !important; }
+
+h1 { margin: 0; font-size: 20px; }
+h2 { margin: 0 0 10px 0; }
+h3 { margin: 0 0 6px 0; font-size: 15px; }
+
+a { color: var(--accent); }
+
+.muted { color: var(--muted); font-size: 13px; }
+.small { font-size: 13px; color: var(--muted); }
+
+/* Layout helpers */
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.muted, .small {
-  color: var(--muted) !important;
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 10px 0;
 }
 
-/* Cards / panels */
-.card, .item, .panel {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-}
-
-.item {
-  background: var(--surface-2) !important;
+.stack {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 /* Inputs */
 input, select, textarea {
-  background: rgba(255,255,255,0.06) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
+select { min-width: 120px; width: auto; }
+
 input::placeholder, textarea::placeholder {
-  color: rgba(255,255,255,0.45) !important;
+  color: rgba(255,255,255,0.45);
 }
 
 /* Buttons */
 button {
-  background: rgba(255,255,255,0.10) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.10);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
-button:hover {
-  background: rgba(255,255,255,0.14) !important;
+button:hover { background: rgba(255,255,255,0.14); }
+
+button.secondary {
+  background: transparent;
 }
 
 button:disabled {
@@ -86,225 +94,104 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button.secondary {
-  background: transparent !important;
+/* Cards/items */
+.card, .item, .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 
-/* Tabs */
-.tabs {
-  border-bottom: 1px solid var(--border) !important;
-}
-
-.tab {
-  background: transparent !important;
-  color: var(--muted) !important;
-  border: 1px solid transparent !important;
-}
-
-.tab.active {
-  color: var(--text) !important;
-  border-color: var(--border) !important;
-  background: rgba(255,255,255,0.06) !important;
+.item {
+  background: var(--surface-2);
+  padding: 12px;
 }
 
 /* Pills */
 .pill {
-  background: rgba(125, 211, 252, 0.12) !important;
-  color: var(--accent) !important;
-  border: 1px solid rgba(125, 211, 252, 0.25) !important;
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  font-size: 12px;
+  margin-left: 6px;
 }
 
-/* Links (if any) */
-a {
-  color: var(--accent) !important;
-}
-/* Force the outer page background (top area + margins) */
-html, body {
-  background: #0b0f17 !important;
-  color: rgba(255,255,255,0.92) !important;
-  min-height: 100%;
-}
+/* ==========================================================
+   OPTION B: HEADER FIXED, WHOLE MAIN SCROLLS
+   ========================================================== */
 
-/* If you have a page wrapper, keep it transparent so body shows through */
-#appSection, #authSection, main, .container, .wrap {
-  background: transparent !important;
-}
-/* Top header area */
-header, #userBar, .topbar {
-  background: transparent !important;
-  color: rgba(255,255,255,0.92) !important;
-}
-/* ---------- Top Header Layout ---------- */
-
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 16px 24px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.title-block h1 {
-  margin: 0;
-}
-
-.subtitle {
-  font-style: italic;
-  font-size: 0.95rem;
-opacity: 0.6;
-letter-spacing: 0.5px;
-
-  margin-top: 4px;
-}
-
-/* Make user section align nicely on right */
-#userBar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-/* ================================
-   Fixed header + scrollable content
-   ================================ */
-
-html, body {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  overflow: hidden; /* prevent whole page from scrolling */
-}
-
-/* Make the body layout: header stays, main fills the rest */
 body {
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* body doesn't scroll */
 }
 
-/* Your top header stays fixed */
+/* Top header stays fixed */
 header.topbar {
   flex: 0 0 auto;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: transparent;
 }
 
-/* Main fills remaining height and does NOT scroll */
+/* Everything below header scrolls */
 main {
   flex: 1 1 auto;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow: auto;              /* ✅ this scrolls */
+  padding: 16px;
+  max-width: 920px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-/* The APP card becomes a scroll container host */
-#appSection.card {
-  flex: 1 1 auto;
-  overflow: hidden;           /* important: contains inner scrolling */
-  display: flex;
-  flex-direction: column;
-  min-height: 0;              /* important for flex + overflow */
-}
+/* ==========================================================
+   HEADER CONTENT (TITLE + SUBTITLE + HAMBURGER)
+   ========================================================== */
 
-/* Tabs row stays visible */
-#appSection .tabs {
-  flex: 0 0 auto;
-}
-
-/* Each panel fills remaining space, but doesn't scroll itself */
-#appSection .panel {
-  flex: 1 1 auto;
-  overflow: hidden;
-  min-height: 0;              /* important */
-}
-
-/* The *list area* is what scrolls */
-#templatesList,
-#exerciseList,
-#historyList,
-#historyDetail,
-#progressView,
-#progressSearchResults,
-#activeWorkout {
-  overflow: auto;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-#authSection.card {
-  flex: 0 0 auto;
-}
-/* Make the active tab panel a flex column so its children can size properly */
-#appSection .panel {
-  display: flex;
-  flex-direction: column;
-}
-
-/* The History header row should not scroll */
-#tab-history > .row {
-  flex: 0 0 auto;
-}
-
-/* The list should fill remaining space and scroll */
-#historyList,
-#historyDetail {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-}
-#tab-history {
-  min-height: 0;
-}
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 16px 24px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  gap: 16px;
 }
 
-.title-block h1 {
-  margin: 0;
-}
+.title-block h1 { margin: 0; }
 
 .subtitle {
   font-style: italic;
   opacity: 0.7;
   margin-top: 4px;
+  letter-spacing: 0.4px;
 }
 
-.menu-wrapper {
-  position: relative;
+/* ==========================================================
+   TABS ROW (HIDDEN — app.js still uses it)
+   ========================================================== */
+
+.tabs-hidden {
+  display: none !important;
 }
 
-.hamburger {
-  font-size: 22px;
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
+/* (if your old tabs still show, this catches common cases) */
+.tabs.tabs-hidden {
+  display: none !important;
 }
 
-.menu-dropdown {
-  position: absolute;
-  right: 0;
-  top: 40px;
-  background: #111c2b;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 10px;
-  padding: 16px;
-  min-width: 220px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-}
+/* ==========================================================
+   HAMBURGER MENU (VERTICAL STACK)
+   ========================================================== */
 
-.menu-dropdown .secondary {
-  width: 100%;
-  margin-top: 10px;
-}
-/* Hamburger user menu */
 .menu {
   position: relative;
   display: flex;
   align-items: center;
 }
 
+/* the ≡ button */
 .menu-btn {
   min-width: 56px;
   height: 44px;
@@ -314,16 +201,16 @@ main {
   border-radius: 12px;
 }
 
-/* dropdown hidden by default */
+/* dropdown panel */
 .menu-panel {
   position: absolute;
   right: 0;
   top: 52px;
-  min-width: 280px;
-  padding: 12px;
+  min-width: 260px;
+  padding: 14px;
   border-radius: 12px;
 
-  background: var(--surface);
+  background: rgba(18, 26, 38, 0.98);
   border: 1px solid var(--border);
   box-shadow: 0 16px 40px rgba(0,0,0,.45);
 
@@ -333,173 +220,13 @@ main {
 
 /* open state */
 .menu.open .menu-panel {
-  display: block;
-}
-
-/* make userBar inside dropdown look nice */
-.menu-panel #userBar {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 10px;
 }
-/* iOS-friendly full-height layout */
-html, body {
-  height: 100%;
-}
 
-body {
-  margin: 0;
-}
-
-/* Use dynamic viewport height on mobile Safari */
-main {
-  height: calc(100dvh - var(--topbar-h, 92px));
-  overflow: hidden; /* prevent page scroll; the app scrolls */
-}
-
-/* Make the signed-in app card fill the available height */
-#appSection.card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0; /* IMPORTANT for nested flex scrolling */
-}
-
-/* Tabs should NOT grow; panel should take remaining space */
-#appSection .tabs {
-  flex: 0 0 auto;
-}
-
-/* Panel area fills remaining height and becomes the scroll container */
-#appSection .panel {
-  flex: 1 1 auto;
-  min-height: 0;         /* IMPORTANT */
-  overflow: auto;
-  -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
-  padding-bottom: 24px;  /* gives finger room at bottom */
-}
-/* Give scrollable panels a bigger grab area */
-#appSection .panel {
-  padding-top: 8px;
-  padding-bottom: 80px; /* big thumb zone */
-}
-:root {
-  --topbar-h: 92px; /* desktop-ish default */
-}
-
-@media (max-width: 640px) {
-  :root {
-    --topbar-h: 110px; /* header wraps more on phones */
-  }
-}
-/* Make panels able to use remaining height */
-#appSection {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Tabs stay fixed at top of the card */
-#appSection .tabs {
-  flex: 0 0 auto;
-}
-
-/* Each panel should fill the remaining space */
-.panel {
-  flex: 1 1 auto;
-  min-height: 0;          /* critical: allows inner scroll areas to work */
-  display: flex;
-  flex-direction: column;
-}
-
-/* Workout tab: let the workout list take the space and scroll */
-#tab-workout #activeWorkout {
-  flex: 1 1 auto;
-  min-height: 0;          /* critical */
-  overflow-y: auto;
-  padding-right: 6px;     /* small gutter so scrollbar doesn't overlap */
-}
-
-/* Make input rows easier to read/tap */
-#tab-workout input {
-  min-height: 42px;
-  font-size: 16px;
-}
-
-/* Make buttons not tiny */
-#tab-workout button {
-  min-height: 42px;
-}
-
-main {
-  min-height: calc(100vh - 90px); /* adjust 90px if your header is taller */
-}
-
-#appSection.card {
-  height: calc(100vh - 120px);    /* adjust if needed */
-  overflow: hidden;
-}
-/* ================================
-   Option B: Tabs in hamburger + whole main scrolls
-   ================================ */
-
-/* Main layout: header stays, everything below scrolls */
-html, body { height: 100%; }
-body {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;            /* no page scroll bar on body */
-}
-
-header.topbar { flex: 0 0 auto; }
-
-main {
-  flex: 1 1 auto;
-  overflow: auto;              /* ✅ the whole app area scrolls */
-  padding: 16px;
-  max-width: 920px;
-  margin: 0 auto;
-}
-
-/* Turn OFF the old “inner list scroll” setup if you added it earlier */
-#appSection.card,
-#appSection .panel,
-#templatesList,
-#exerciseList,
-#historyList,
-#historyDetail,
-#progressView,
-#progressSearchResults,
-#activeWorkout {
-  overflow: visible !important;
-  min-height: auto !important;
-  flex: initial !important;
-}
-
-/* Hide the old tab row (we still keep it in DOM for app.js logic) */
-.tabs-hidden { display: none !important; }
-
-/* Hamburger menu UI */
-.menu-wrap { position: relative; }
-.icon-btn {
-  font-size: 22px;
-  line-height: 1;
-  padding: 10px 12px;
-  border-radius: 10px;
-}
-
-.menu {
-  position: absolute;
-  right: 0;
-  top: 48px;
-  min-width: 260px;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(18, 26, 38, 0.98);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
-  z-index: 999;
-}
-
+/* menu items */
 .menu-item {
   width: 100%;
   text-align: left;
@@ -514,40 +241,22 @@ main {
   background: rgba(255,255,255,0.06);
 }
 
+/* divider */
 .menu-divider {
   height: 1px;
   background: rgba(255,255,255,0.10);
-  margin: 10px 0;
-}
-/* --------------------------------------------------------------------------
-   Menu panel (hamburger) — vertical layout
-   -------------------------------------------------------------------------- */
-
-.menu-panel {
-  display: none;
+  margin: 6px 0;
 }
 
-.menu.open .menu-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.menu-panel > button,
-.menu-panel > a,
-.menu-panel > .menu-item {
-  width: 100%;
-  text-align: left;
-}
-
-.menu-panel .menu-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.10);
-  margin: 8px 0;
-}
-
-.menu-panel .menu-user {
+/* signed in area */
+.menu-user {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* make sign out look consistent */
+.menu-user button {
+  width: 100%;
+  text-align: left;
 }
