@@ -141,7 +141,7 @@ header.topbar {
 /* Everything below header scrolls */
 main {
   flex: 1 1 auto;
-  overflow: auto;              /* ✅ this scrolls */
+  overflow: auto;
   padding: 16px;
   max-width: 920px;
   margin: 0 auto;
@@ -175,24 +175,21 @@ main {
 .tabs-hidden {
   display: none !important;
 }
-
-/* (if your old tabs still show, this catches common cases) */
 .tabs.tabs-hidden {
   display: none !important;
 }
 
 /* ==========================================================
-   HAMBURGER MENU (VERTICAL STACK)
+   HAMBURGER MENU (FIXED TO YOUR HTML)
    ========================================================== */
 
-.menu {
+/* wrapper around button + dropdown */
+.menu-wrap {
   position: relative;
-  display: flex;
-  align-items: center;
 }
 
-/* the ≡ button */
-.menu-btn {
+/* hamburger button */
+.icon-btn {
   min-width: 56px;
   height: 44px;
   padding: 0 18px;
@@ -201,8 +198,8 @@ main {
   border-radius: 12px;
 }
 
-/* dropdown panel */
-.menu-panel {
+/* dropdown panel (THIS is your vertical menu) */
+#hamburgerMenu.menu {
   position: absolute;
   right: 0;
   top: 52px;
@@ -214,16 +211,11 @@ main {
   border: 1px solid var(--border);
   box-shadow: 0 16px 40px rgba(0,0,0,.45);
 
-  display: none;
-  z-index: 9999;
-}
-
-/* open state */
-.menu.open .menu-panel {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: column;     /* ✅ vertical */
+  align-items: stretch;       /* ✅ full width */
   gap: 10px;
+  z-index: 9999;
 }
 
 /* menu items */
@@ -234,6 +226,7 @@ main {
   border-radius: 10px;
   background: transparent;
   border: 1px solid transparent;
+  display: block;             /* ✅ no inline */
 }
 
 .menu-item:hover {
@@ -250,7 +243,7 @@ main {
 
 /* signed in area */
 .menu-user {
-  display: flex;
+  display: flex;              /* ✅ vertical stack */
   flex-direction: column;
   gap: 8px;
 }
