@@ -71,13 +71,24 @@
           <div id="exerciseList" class="stack"></div>
         </div>
 
-        <!-- History -->
-        <div class="panel hidden" id="tab-history">
-          <h2>History</h2>
+<!-- History -->
+<div class="panel hidden" id="tab-history">
+  <div class="row" style="justify-content: space-between; align-items: center;">
+    <h2 style="margin:0;">History</h2>
 
-          <div id="historyDetail" class="stack hidden"></div>
-          <div id="historyList" class="stack"></div>
-        </div>
+    <select id="historyFilter">
+      <option value="20" selected>Last 20</option>
+      <option value="50">Last 50</option>
+      <option value="200">Last 200</option>
+      <option value="7d">Last 7 days</option>
+      <option value="30d">Last 30 days</option>
+      <option value="all">All</option>
+    </select>
+  </div>
+
+  <div id="historyDetail" class="stack hidden"></div>
+  <div id="historyList" class="stack"></div>
+</div>
 
         <!-- Progress -->
         <div class="panel hidden" id="tab-progress">
