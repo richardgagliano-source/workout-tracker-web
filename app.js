@@ -1516,6 +1516,7 @@ header.append(title, actions);
   detail.innerHTML = "";
   detail.appendChild(wrap);
 }
+$("historyFilter")?.addEventListener("change", refreshHistory);
 
 // --------------------
 // Bootstrap / refreshAll
