@@ -9,27 +9,29 @@
 
   <body>
     <header class="topbar">
-  <div class="title-block">
-    <h1>Richard and Kevin's Workout Tracker</h1>
-    <div class="subtitle">for our healthy life</div>
-  </div>
+      <div class="title-block">
+        <h1>Richard and Kevin's Workout Tracker</h1>
+        <div class="subtitle">for our healthy life</div>
+      </div>
 
-  <div class="menu" id="userMenu">
-    <button
-      class="menu-btn secondary"
-      id="menuBtn"
-      type="button"
-      aria-label="Open menu"
-      aria-expanded="false"
-    >
-      ☰
-    </button>
+      <!-- Hamburger -->
+      <div class="menu-wrap">
+        <button id="hamburgerBtn" class="icon-btn" aria-label="Menu">☰</button>
 
-    <div class="menu-panel" id="menuPanel">
-      <div id="userBar"></div>
-    </div>
-  </div>
-</header>
+        <div id="hamburgerMenu" class="menu hidden">
+          <button class="menu-item" data-tab="workout">Let’s go bro! (Start a workout)</button>
+          <button class="menu-item" data-tab="templates">Create</button>
+          <button class="menu-item" data-tab="library">Library</button>
+          <button class="menu-item" data-tab="history">History</button>
+          <button class="menu-item" data-tab="progress">Progress</button>
+
+          <div class="menu-divider"></div>
+
+          <!-- Signed in as / Sign out will render here -->
+          <div id="userBar"></div>
+        </div>
+      </div>
+    </header>
 
     <main>
       <!-- AUTH -->
@@ -48,18 +50,31 @@
 
       <!-- APP -->
       <section id="appSection" class="card hidden">
-        <div class="tabs">
-          <!-- ORDER + LABELS UPDATED -->
-          <button class="tab active" data-tab="workout">Let's Go Bro!</button>
-          <button class="tab" data-tab="templates">Create</button>
+
+        <!-- KEEP these tabs (hidden) so your existing app.js tab logic still works -->
+        <div class="tabs tabs-hidden">
+          <button class="tab" data-tab="workout">Workout</button>
+          <button class="tab" data-tab="templates">Programs</button>
           <button class="tab" data-tab="library">Library</button>
           <button class="tab" data-tab="history">History</button>
           <button class="tab" data-tab="progress">Progress</button>
         </div>
 
-        <!-- Workout (DEFAULT VISIBLE) -->
-        <div class="panel" id="tab-workout">
-          <h2>Start a Workout</h2>
+        <!-- Templates -->
+        <div class="panel" id="tab-templates">
+          <h2>Programs</h2>
+
+          <div class="row">
+            <input id="tplName" placeholder="Program name (e.g., Push A)" />
+            <button id="createTplBtn">Create</button>
+          </div>
+
+          <div id="templatesList" class="stack"></div>
+        </div>
+
+        <!-- Workout -->
+        <div class="panel hidden" id="tab-workout">
+          <h2>Start workout</h2>
           <div class="row">
             <select id="startTplSelect"></select>
             <button id="startWorkoutBtn">Start</button>
@@ -70,21 +85,9 @@
           <p class="muted" id="workoutMsg"></p>
         </div>
 
-        <!-- Templates (Create a Workout) -->
-        <div class="panel hidden" id="tab-templates">
-          <h2>Create a Workout</h2>
-
-          <div class="row">
-            <input id="tplName" placeholder="Program name (e.g., Push A)" />
-            <button id="createTplBtn">Create</button>
-          </div>
-
-          <div id="templatesList" class="stack"></div>
-        </div>
-
         <!-- Library -->
         <div class="panel hidden" id="tab-library">
-          <h2>Exercise Library</h2>
+          <h2>Exercise library</h2>
           <input id="exerciseSearch" placeholder="Search exercises..." />
           <div id="exerciseList" class="stack"></div>
         </div>
@@ -92,7 +95,7 @@
         <!-- History -->
         <div class="panel hidden" id="tab-history">
           <div class="row" style="justify-content: space-between; align-items: center;">
-            <h2 style="margin:0;">Workout History</h2>
+            <h2 style="margin:0;">History</h2>
 
             <select id="historyFilter">
               <option value="20" selected>Last 20</option>
@@ -110,7 +113,7 @@
 
         <!-- Progress -->
         <div class="panel hidden" id="tab-progress">
-          <h2>Exercise Progress</h2>
+          <h2>Progress & PRs</h2>
 
           <div class="row">
             <input id="progressSearch" placeholder="Search exercise (e.g., Bench Press)..." />
@@ -122,66 +125,6 @@
       </section>
     </main>
 
-    <!-- Small menu toggler (independent of app.js) -->
-    <script>
-      (function () {
-        const menu = document.getElementById("userMenu");
-        const btn = document.getElementById("menuBtn");
-
-        function closeMenu() {
-          menu.classList.remove("open");
-          btn.setAttribute("aria-expanded", "false");
-        }
-
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const isOpen = menu.classList.toggle("open");
-          btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
-        });
-
-        document.addEventListener("click", (e) => {
-          if (!menu.contains(e.target)) closeMenu();
-        });
-
-        document.addEventListener("keydown", (e) => {
-          if (e.key === "Escape") closeMenu();
-        });
-      })();
-    </script>
-
     <script type="module" src="./app.js"></script>
-    <script>
-  (function () {
-    function setOpen(open) {
-      const menu = document.getElementById("userMenu");
-      const btn = document.getElementById("menuBtn");
-      if (!menu || !btn) return;
-      menu.classList.toggle("open", open);
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    }
-
-    // Toggle when clicking hamburger (event delegation)
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest("#menuBtn");
-      if (btn) {
-        e.preventDefault();
-        e.stopPropagation();
-        const menu = document.getElementById("userMenu");
-        const isOpen = menu?.classList.contains("open");
-        setOpen(!isOpen);
-        return;
-      }
-
-      // Click outside closes it
-      const menu = document.getElementById("userMenu");
-      if (menu && !menu.contains(e.target)) setOpen(false);
-    });
-
-    // Escape closes it
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") setOpen(false);
-    });
-  })();
-</script>
   </body>
 </html>
