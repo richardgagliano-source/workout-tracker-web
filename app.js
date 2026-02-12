@@ -294,11 +294,7 @@ $("exerciseSearch").addEventListener("input", async () => {
       card.className = "item";
      card.innerHTML = `
   <h3>${e.name}</h3>
-  <div class="small">
-    <a href="${e.video_link}" target="_blank" rel="noopener noreferrer">
-      ${e.video_link}
-    </a>
-  </div>
+  ${renderVideoThumb(e.video_link)}
 `;
 
       list.appendChild(card);
@@ -454,8 +450,6 @@ await fetchJSON("/rest/v1/exercises", {
 
       // Clear form, hide and refresh visible list
       nameInput.value = "";
-      muscleInput.value = "";
-      equipInput.value = "";
       form.classList.add("hidden");
       toggleBtn.textContent = "Add exercise";
       msg.textContent = "";
@@ -470,7 +464,10 @@ await fetchJSON("/rest/v1/exercises", {
         (ex || []).slice(0, 80).forEach((e) => {
           const card = document.createElement("div");
           card.className = "item";
-          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} </div>${renderVideoThumb(e.video_link)}`;
+          card.innerHTML = `
+  <h3>${e.name}</h3>
+  ${renderVideoThumb(e.video_link)}
+`;
           list.appendChild(card);
         });
         if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
@@ -1753,7 +1750,10 @@ async function refreshAll() {
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
       card.className = "item";
-      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""}</div>`;
+      card.innerHTML = `
+  <h3>${e.name}</h3>
+  ${renderVideoThumb(e.video_link)}
+`;
       list.appendChild(card);
     });
   } catch (err) {
