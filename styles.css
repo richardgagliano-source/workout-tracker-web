@@ -347,3 +347,9 @@ a:hover {
   gap:12px;
   align-items:center;
 }
+.video-thumb {
+  width: 160px;
+  border-radius: 6px;
+  margin-top: 8px;
+  display: block;
+}
