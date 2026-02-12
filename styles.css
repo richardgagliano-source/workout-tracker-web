@@ -336,3 +336,14 @@ a:hover {
   .video-thumb { width: 120px; height: 68px; }
   .video-link { margin-right: 10px; }
 }
+.video-thumb {
+  width: 160px;        /* adjust as you like */
+  height: auto;
+  border-radius: 6px;
+  display: block;
+}
+.video-thumb-container {
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
