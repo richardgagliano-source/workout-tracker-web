@@ -236,7 +236,7 @@ function renderUserBar(user) {
 async function loadExercises(search = "") {
   const term = search.trim();
   const params = new URLSearchParams();
-  params.set("select", "id,name,video_link,equipment");
+  params.set("select", "id,name,video_link");
   params.set("order", "name.asc");
   params.set("limit", "80");
   if (term) params.set("name", `ilike.*${term.replaceAll("*", "")}*`);
@@ -298,7 +298,6 @@ $("exerciseSearch").addEventListener("input", async () => {
     <a href="${e.video_link}" target="_blank" rel="noopener noreferrer">
       ${e.video_link}
     </a>
-    ${e.equipment ? " - " + e.equipment : ""}
   </div>
 `;
 
@@ -359,11 +358,6 @@ $("exerciseSearch").addEventListener("input", async () => {
   muscleInput.style.flex = "1";
   row.appendChild(muscleInput);
 
-  const equipInput = document.createElement("input");
-  equipInput.placeholder = "Equipment (optional)";
-  equipInput.style.flex = "1";
-  row.appendChild(equipInput);
-
   form.appendChild(row);
 
   const actions = document.createElement("div");
@@ -422,7 +416,6 @@ $("exerciseSearch").addEventListener("input", async () => {
     msg.textContent = "";
     const name = nameInput.value.trim();
     const video_link = muscleInput.value.trim() || null;
-    const equipment = equipInput.value.trim() || null;
 
     if (!name) {
       msg.textContent = "Please enter a name.";
@@ -453,7 +446,6 @@ await fetchJSON("/rest/v1/exercises", {
   body: [{
     name,
     video_link: video_link || null,
-    equipment: equipment || null,
     notes: null,
     is_system: false,
     owner_user_id: userId
@@ -478,7 +470,7 @@ await fetchJSON("/rest/v1/exercises", {
         (ex || []).slice(0, 80).forEach((e) => {
           const card = document.createElement("div");
           card.className = "item";
-          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>${renderVideoThumb(e.video_link)}`;
+          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} </div>${renderVideoThumb(e.video_link)}`;
           list.appendChild(card);
         });
         if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
@@ -1761,7 +1753,7 @@ async function refreshAll() {
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
       card.className = "item";
-      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""} - ${e.equipment || ""}</div>`;
+      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""}</div>`;
       list.appendChild(card);
     });
   } catch (err) {
