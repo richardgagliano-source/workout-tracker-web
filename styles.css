@@ -263,3 +263,17 @@ main {
   text-align: left;
 }
 #hamburgerBtn { pointer-events: auto; }
+/* Mobile centering fix */
+@media (max-width: 768px) {
+  main {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .card, .panel {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
