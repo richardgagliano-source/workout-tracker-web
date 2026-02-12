@@ -732,8 +732,7 @@ $("createTplBtn").addEventListener("click", async () => {
   try {
     const userId = getUserIdOrThrow();
 
-    // You can hardcode a default, or set null.
-    await createTemplate(userId, name, null);
+    await createTemplate(userId, name, "program"); // <-- NOT NULL now
 
     $("tplName").value = "";
     await refreshTemplates();
