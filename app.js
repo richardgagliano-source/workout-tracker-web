@@ -295,8 +295,8 @@ $("exerciseSearch").addEventListener("input", async () => {
      card.innerHTML = `
   <h3>${e.name}</h3>
   <div class="small">
-    <a href="${e.video_url}" target="_blank" rel="noopener noreferrer">
-      ${e.video_url}
+    <a href="${e.video_link}" target="_blank" rel="noopener noreferrer">
+      ${e.video_link}
     </a>
     ${e.equipment ? " - " + e.equipment : ""}
   </div>
