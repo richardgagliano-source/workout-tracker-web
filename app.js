@@ -236,7 +236,7 @@ function renderUserBar(user) {
 async function loadExercises(search = "") {
   const term = search.trim();
   const params = new URLSearchParams();
-  params.set("select", "id,name,primary_muscle,equipment");
+  params.set("select", "id,name,video_link,equipment");
   params.set("order", "name.asc");
   params.set("limit", "80");
   if (term) params.set("name", `ilike.*${term.replaceAll("*", "")}*`);
@@ -253,7 +253,7 @@ $("exerciseSearch").addEventListener("input", async () => {
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
       card.className = "item";
-      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
+      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""} - ${e.equipment || ""}</div>`;
       list.appendChild(card);
     });
     if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
@@ -373,7 +373,7 @@ $("exerciseSearch").addEventListener("input", async () => {
   saveBtn.addEventListener("click", async () => {
     msg.textContent = "";
     const name = nameInput.value.trim();
-    const primary_muscle = muscleInput.value.trim() || null;
+    const video_link = muscleInput.value.trim() || null;
     const equipment = equipInput.value.trim() || null;
 
     if (!name) {
@@ -404,7 +404,7 @@ await fetchJSON("/rest/v1/exercises", {
   method: "POST",
   body: [{
     name,
-    primary_muscle: primary_muscle || null,
+    video_link: video_link || null,
     equipment: equipment || null,
     notes: null,
     is_system: false,
@@ -430,7 +430,7 @@ await fetchJSON("/rest/v1/exercises", {
         (ex || []).slice(0, 80).forEach((e) => {
           const card = document.createElement("div");
           card.className = "item";
-          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
+          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""} - ${e.equipment || ""}</div>`;
           list.appendChild(card);
         });
         if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
@@ -1713,7 +1713,7 @@ async function refreshAll() {
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
       card.className = "item";
-      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
+      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""} - ${e.equipment || ""}</div>`;
       list.appendChild(card);
     });
   } catch (err) {
