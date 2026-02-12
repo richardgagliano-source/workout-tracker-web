@@ -552,308 +552,329 @@ function refreshStartWorkoutDropdown() {
 }
 
 async function refreshTemplates() {
-  const list = $("templatesList");
-  list.innerHTML = "Loading...";
-
-  let userId;
-  try {
-    userId = getUserIdOrThrow();
-  } catch {
-    list.innerHTML = `<div class="muted">Not signed in.</div>`;
-    return;
-  }
-
-  try {
-    cachedTemplates = await loadTemplatesFull(userId);
-  } catch (err) {
-    console.error("Templates load failed:", err);
-    list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
-    return;
-  }
-
-  refreshStartWorkoutDropdown();
-
-  list.innerHTML = "";
-  if (!cachedTemplates.length) {
-    list.innerHTML = `<div class="muted">No programs yet. Add one, bb!.</div>`;
-    return;
-  }
-
-  for (const t of cachedTemplates) {
-    const card = document.createElement("div");
-    card.className = "item";
-
-    // Header row
-    const header = document.createElement("div");
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.justifyContent = "space-between";
-    header.style.gap = "12px";
-    header.style.cursor = "pointer";
-
-    const left = document.createElement("div");
-
-    const h = document.createElement("h3");
-    h.style.margin = "0";
-    h.textContent = t.name;
-
-    const meta = document.createElement("div");
-    meta.className = "small";
-    const exCount = (t.workout_template_exercises || []).length;
-    meta.textContent = `${exCount} exercise${exCount === 1 ? "" : "s"}`;
-
-    left.appendChild(h);
-    left.appendChild(meta);
-
-    const chevron = document.createElement("div");
-    chevron.className = "small";
-
-    header.appendChild(left);
-    header.appendChild(chevron);
-
-    // Details
-    const details = document.createElement("div");
-    details.className = "stack";
-
-    const isOpen = openProgramIds.has(t.id);
-    if (!isOpen) details.classList.add("hidden");
-    chevron.textContent = isOpen ? "Hide ▴" : "Show ▾";
-
-    const current = (t.workout_template_exercises || [])
-      .slice()
-      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-
-    // exercise list
-    const ul = document.createElement("div");
-    ul.className = "stack";
-
-    current.forEach((x, idx) => {
-      const row = document.createElement("div");
-      row.className = "item";
-      row.style.display = "flex";
-      row.style.alignItems = "center";
-      row.style.justifyContent = "space-between";
-      row.style.gap = "12px";
-
-      const name = x.exercises?.name || "Exercise";
-      const leftText = document.createElement("div");
-      leftText.innerHTML = `<b>${idx + 1}.</b> ${name}`;
-
-      const actions = document.createElement("div");
-      actions.style.display = "flex";
-      actions.style.gap = "8px";
-
-      // UP button
-      const up = document.createElement("button");
-      up.className = "secondary";
-      up.textContent = "↑";
-      up.disabled = idx === 0;
-
-      // DOWN button  ✅ (this is what you were missing)
-      const down = document.createElement("button");
-      down.className = "secondary";
-      down.textContent = "↓";
-      down.disabled = idx === current.length - 1;
-
-      // temp swap helper
-      const TEMP = -999999;
-
-      up.onclick = async (e) => {
-        e.stopPropagation();
-        const above = current[idx - 1];
-        const me = x;
-        if (!above) return;
-
-        const a = above.order_index ?? (idx - 1);
-        const b = me.order_index ?? idx;
-
-        // above -> TEMP
-        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", above.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // me -> a
-        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // above(TEMP) -> b
-        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
-
-      down.onclick = async (e) => {
-        e.stopPropagation();
-        const below = current[idx + 1];
-        const me = x;
-        if (!below) return;
-
-        const a = below.order_index ?? (idx + 1);
-        const b = me.order_index ?? idx;
-
-        // below -> TEMP
-        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", below.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // me -> a
-        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // below(TEMP) -> b
-        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
-
-      const del = document.createElement("button");
-      del.className = "secondary";
-      del.textContent = "Remove";
-      del.onclick = async (e) => {
-        e.stopPropagation();
-        const ok = confirm("Remove this exercise from the program?");
-        if (!ok) return;
-
-        const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
-        if (error) alert(error.message);
-
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
-
-      actions.append(up, down, del);
-      row.append(leftText, actions);
-      ul.appendChild(row);
-    });
-
-    // search to add
-    const search = document.createElement("input");
-    search.placeholder = "Search exercises to add…";
-    search.value = programSearchTerms.get(t.id) || "";
-
-    const results = document.createElement("div");
-    results.className = "stack";
-
-    let searchReqId = 0;
-    let searchTimer = null;
-
-    search.addEventListener("input", (e) => {
-      e.stopPropagation();
-      clearTimeout(searchTimer);
-
-      searchTimer = setTimeout(async () => {
-        const term = search.value.trim();
-        programSearchTerms.set(t.id, term);
-
-        results.innerHTML = "";
-        if (term.length < 2) return;
-
-        const myReqId = ++searchReqId;
-
-        let ex = [];
-        try {
-          ex = await loadExercises(term);
-        } catch (err) {
-          console.error(err);
-          results.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
-          return;
-        }
-
-        if (myReqId !== searchReqId) return;
-
-        const seen = new Set();
-        (ex || []).slice(0, 10).forEach((exRow) => {
-          if (!exRow?.id || seen.has(exRow.id)) return;
-          seen.add(exRow.id);
-
-          const b = document.createElement("button");
-          b.className = "secondary";
-          b.textContent = `Add: ${exRow.name}`;
-
-          b.onclick = async (ev) => {
-            ev.stopPropagation();
-
-            const already = current.some((r) => r.exercise_id === exRow.id);
-            if (already) { alert("That exercise is already in this program."); return; }
-
-            const { data: lastRow, error: lastErr } = await sb
-              .from("workout_template_exercises")
-              .select("order_index")
-              .eq("template_id", t.id)
-              .order("order_index", { ascending: false })
-              .limit(1);
-
-            if (lastErr) { alert(lastErr.message); return; }
-
-            const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
-
-            const { error: insErr } = await sb.from("workout_template_exercises").insert({
-              template_id: t.id,
-              exercise_id: exRow.id,
-              order_index: nextIndex,
-            });
-
-            if (insErr) { alert(insErr.message); return; }
-
-            openProgramIds.add(t.id);
-            lastProgramFocusId = t.id;
-            await refreshTemplates();
-          };
-
-          results.appendChild(b);
-        });
-      }, 120);
-    });
-
-    // Keep the program open + keep search/results after refresh
-    if (isOpen && search.value.trim().length >= 2) {
-      search.dispatchEvent(new Event("input"));
-    }
-    if (lastProgramFocusId === t.id) {
-      setTimeout(() => search.focus(), 0);
-      lastProgramFocusId = null;
-    }
-
-    const delTpl = document.createElement("button");
-    delTpl.className = "secondary";
-    delTpl.textContent = "Delete program";
-    delTpl.onclick = async (e) => {
-      e.stopPropagation();
-      if (!confirm("Delete this program?")) return;
-
-      const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
-      if (error) alert(error.message);
-
-      openProgramIds.delete(t.id);
-      programSearchTerms.delete(t.id);
-      if (lastProgramFocusId === t.id) lastProgramFocusId = null;
-
-      await refreshTemplates();
-    };
-
-    details.append(ul, search, results, delTpl);
-
-    header.addEventListener("click", () => {
-      const isHidden = details.classList.contains("hidden");
-      if (isHidden) {
-        details.classList.remove("hidden");
-        chevron.textContent = "Hide ▴";
-        openProgramIds.add(t.id);
-      } else {
-        details.classList.add("hidden");
-        chevron.textContent = "Show ▾";
-        openProgramIds.delete(t.id);
-      }
-    });
-
-    card.append(header, details);
-    list.appendChild(card);
-  }
+  const list = $("templatesList");
+  list.innerHTML = "Loading...";
+
+  let userId;
+  try { userId = getUserIdOrThrow(); }
+  catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
+
+  try {
+    cachedTemplates = await loadTemplatesFull(userId);
+  } catch (err) {
+    console.error("Templates load failed:", err);
+    list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
+    return;
+  }
+
+  refreshStartWorkoutDropdown();
+
+  list.innerHTML = "";
+  if (!cachedTemplates.length) {
+    list.innerHTML = `<div class="muted">No programs yet. Add one, bb!.</div>`;
+    return;
+  }
+
+  for (const t of cachedTemplates) {
+    const card = document.createElement("div");
+    card.className = "item";
+
+    // Header row
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+    header.style.gap = "12px";
+    header.style.cursor = "pointer";
+
+    const left = document.createElement("div");
+
+    const h = document.createElement("h3");
+    h.style.margin = "0";
+    h.textContent = t.name;
+
+    const meta = document.createElement("div");
+    meta.className = "small";
+    const exCount = (t.workout_template_exercises || []).length;
+    meta.textContent = `${exCount} exercise${exCount === 1 ? "" : "s"}`;
+
+    left.appendChild(h);
+    left.appendChild(meta);
+
+    const chevron = document.createElement("div");
+    chevron.className = "small";
+
+    header.appendChild(left);
+    header.appendChild(chevron);
+
+    // Details
+    const details = document.createElement("div");
+    details.className = "stack";
+
+    const isOpen = openProgramIds.has(t.id);
+    if (!isOpen) details.classList.add("hidden");
+    chevron.textContent = isOpen ? "Hide ▴" : "Show ▾";
+
+    const current = (t.workout_template_exercises || [])
+      .slice()
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    // exercise list
+    const ul = document.createElement("div");
+    ul.className = "stack";
+
+    current.forEach((x, idx) => {
+      const row = document.createElement("div");
+      row.className = "item";
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.justifyContent = "space-between";
+      row.style.gap = "12px";
+
+      const name = x.exercises?.name || "Exercise";
+      const leftText = document.createElement("div");
+      leftText.innerHTML = `<b>${idx + 1}.</b> ${name}`;
+
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.gap = "8px";
+
+      // create the up/down buttons first (avoid reference errors)
+      const up = document.createElement("button");
+      up.className = "secondary";
+      up.textContent = "↑";
+      up.disabled = idx === 0;
+
+      const down = document.createElement("button");
+      down.className = "secondary";
+      down.textContent = "↓";
+      down.disabled = idx === current.length - 1;
+
+      // ---- UP handler ----
+      up.onclick = async (e) => {
+        e.stopPropagation();
+        const above = current[idx - 1];
+        const me = x;
+        if (!above) return;
+
+        // compute current positions (fallback to index if missing)
+        const a = above.order_index ?? (idx - 1);
+        const b = me.order_index ?? idx;
+
+        // temp value unlikely to exist
+        const TEMP = -999999;
+
+        // step 1: set the above row to TEMP
+        let res = await sb
+          .from("workout_template_exercises")
+          .update({ order_index: TEMP })
+          .eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // step 2: set me to above's original position (a)
+        res = await sb
+          .from("workout_template_exercises")
+          .update({ order_index: a })
+          .eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // step 3: set TEMP row to my original position (b)
+        res = await sb
+          .from("workout_template_exercises")
+          .update({ order_index: b })
+          .eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
+
+      // ---- DOWN handler ----
+      down.onclick = async (e) => {
+        e.stopPropagation();
+        const below = current[idx + 1];
+        const me = x;
+        if (!below) return;
+
+        const a = below.order_index ?? (idx + 1);
+        const b = me.order_index ?? idx;
+        const TEMP = -999999;
+
+        // temp the below row
+        let res = await sb
+          .from("workout_template_exercises")
+          .update({ order_index: TEMP })
+          .eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // move me into below's original spot
+        res = await sb
+          .from("workout_template_exercises")
+          .update({ order_index: a })
+          .eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // move the TEMP row into my original spot
+        res = await sb
+          .from("workout_template_exercises")
+          .update({ order_index: b })
+          .eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
+
+      const del = document.createElement("button");
+      del.className = "secondary";
+      del.textContent = "Remove";
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        const ok = confirm("Remove this exercise from the program?");
+        if (!ok) return;
+
+        const { error } = await sb
+          .from("workout_template_exercises")
+          .delete()
+          .eq("id", x.id);
+
+        if (error) alert(error.message);
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
+
+      actions.append(up, down, del);
+      row.append(leftText, actions);
+      ul.appendChild(row);
+    });
+
+    // search to add
+    const search = document.createElement("input");
+    search.placeholder = "Search exercises to add…";
+    search.value = programSearchTerms.get(t.id) || "";
+
+    const results = document.createElement("div");
+    results.className = "stack";
+
+    let searchReqId = 0;
+    let searchTimer = null;
+
+    search.addEventListener("input", (e) => {
+      e.stopPropagation();
+      clearTimeout(searchTimer);
+
+      searchTimer = setTimeout(async () => {
+        const term = search.value.trim();
+        programSearchTerms.set(t.id, term);
+
+        results.innerHTML = "";
+        if (term.length < 2) return;
+
+        const myReqId = ++searchReqId;
+
+        let ex = [];
+        try {
+          ex = await loadExercises(term);
+        } catch (err) {
+          console.error(err);
+          results.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
+          return;
+        }
+
+        if (myReqId !== searchReqId) return;
+
+        const seen = new Set();
+        (ex || []).slice(0, 10).forEach((exRow) => {
+          if (!exRow?.id || seen.has(exRow.id)) return;
+          seen.add(exRow.id);
+
+          const b = document.createElement("button");
+          b.className = "secondary";
+          b.textContent = `Add: ${exRow.name}`;
+
+          b.onclick = async (ev) => {
+            ev.stopPropagation();
+
+            const already = current.some((r) => r.exercise_id === exRow.id);
+            if (already) { alert("That exercise is already in this program."); return; }
+
+            const { data: lastRow, error: lastErr } = await sb
+              .from("workout_template_exercises")
+              .select("order_index")
+              .eq("template_id", t.id)
+              .order("order_index", { ascending: false })
+              .limit(1);
+
+            if (lastErr) { alert(lastErr.message); return; }
+
+            const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+
+            const { error: insErr } = await sb.from("workout_template_exercises").insert({
+              template_id: t.id,
+              exercise_id: exRow.id,
+              order_index: nextIndex,
+            });
+
+            if (insErr) { alert(insErr.message); return; }
+
+            openProgramIds.add(t.id);
+            lastProgramFocusId = t.id;
+            await refreshTemplates();
+          };
+
+          results.appendChild(b);
+        });
+      }, 120);
+    });
+
+    // Keep program open + keep search/results after refresh
+    if (isOpen && search.value.trim().length >= 2) {
+      search.dispatchEvent(new Event("input"));
+    }
+    if (lastProgramFocusId === t.id) {
+      setTimeout(() => search.focus(), 0);
+      lastProgramFocusId = null;
+    }
+
+    const delTpl = document.createElement("button");
+    delTpl.className = "secondary";
+    delTpl.textContent = "Delete program";
+    delTpl.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm("Delete this program?")) return;
+
+      const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
+      if (error) alert(error.message);
+
+      openProgramIds.delete(t.id);
+      programSearchTerms.delete(t.id);
+      if (lastProgramFocusId === t.id) lastProgramFocusId = null;
+
+      await refreshTemplates();
+    };
+
+    details.append(ul, search, results, delTpl);
+
+    header.addEventListener("click", () => {
+      const isHidden = details.classList.contains("hidden");
+      if (isHidden) {
+        details.classList.remove("hidden");
+        chevron.textContent = "Hide ▴";
+        openProgramIds.add(t.id);
+      } else {
+        details.classList.add("hidden");
+        chevron.textContent = "Show ▾";
+        openProgramIds.delete(t.id);
+      }
+    });
+
+    card.append(header, details);
+    list.appendChild(card);
+  }
 }
 
 $("createTplBtn").addEventListener("click", async () => {
