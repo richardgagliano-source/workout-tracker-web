@@ -253,7 +253,16 @@ $("exerciseSearch").addEventListener("input", async () => {
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
       card.className = "item";
-      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""} - ${e.equipment || ""}</div>`;
+     card.innerHTML = `
+  <h3>${e.name}</h3>
+  <div class="small">
+    <a href="${e.video_url}" target="_blank" rel="noopener noreferrer">
+      ${e.video_url}
+    </a>
+    ${e.equipment ? " - " + e.equipment : ""}
+  </div>
+`;
+
       list.appendChild(card);
     });
     if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
