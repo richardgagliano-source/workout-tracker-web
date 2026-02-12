@@ -603,41 +603,52 @@ cachedTemplates = await loadTemplatesFull(userId);
       up.className = "secondary";
       up.textContent = "↑";
       up.disabled = idx === 0;
-      up.onclick = async (e) => {
-        e.stopPropagation();
-        const above = current[idx - 1];
-        const me = x;
-        if (!above) return;
+up.onclick = async (e) => {
+  e.stopPropagation();
+  const above = current[idx - 1];
+  const me = x;
+  if (!above) return;
 
-        const a = above.order_index ?? (idx - 1);
-        const b = me.order_index ?? idx;
+  // Swap using positions (works even if order_index duplicates)
+  const { error: e1 } = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: idx })
+    .eq("id", above.id);
 
-        await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
-        await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
+  if (e1) { alert("Move failed: " + e1.message); return; }
 
-      const down = document.createElement("button");
-      down.className = "secondary";
-      down.textContent = "↓";
-      down.disabled = idx === current.length - 1;
-      down.onclick = async (e) => {
-        e.stopPropagation();
-        const below = current[idx + 1];
-        const me = x;
-        if (!below) return;
+  const { error: e2 } = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: idx - 1 })
+    .eq("id", me.id);
 
-        const a = below.order_index ?? (idx + 1);
-        const b = me.order_index ?? idx;
+  if (e2) { alert("Move failed: " + e2.message); return; }
 
-        await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
-        await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
+  await refreshTemplates({ openTemplateId: t.id });
+};
+
+down.onclick = async (e) => {
+  e.stopPropagation();
+  const below = current[idx + 1];
+  const me = x;
+  if (!below) return;
+
+  const { error: e1 } = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: idx })
+    .eq("id", below.id);
+
+  if (e1) { alert("Move failed: " + e1.message); return; }
+
+  const { error: e2 } = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: idx + 1 })
+    .eq("id", me.id);
+
+  if (e2) { alert("Move failed: " + e2.message); return; }
+
+  await refreshTemplates({ openTemplateId: t.id });
+};
 
       const del = document.createElement("button");
       del.className = "secondary";
