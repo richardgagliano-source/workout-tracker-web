@@ -301,3 +301,38 @@ a {
 a:hover {
   text-decoration: underline;
 }
+/* video thumbnail + link in the library list */
+.video-link {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 12px;
+  text-decoration: none;
+}
+
+.video-thumb {
+  width: 160px;         /* thumbnail size — adjust if you want smaller/larger */
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: transform .18s ease, box-shadow .18s ease;
+  background: #0b0f14;  /* dark fallback while loading */
+}
+
+.video-link:hover .video-thumb,
+.video-link:focus .video-thumb {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+
+/* text next to thumbnail */
+.small .equipment {
+  color: var(--muted);
+  font-size: 0.92rem;
+  vertical-align: middle;
+}
+@media (max-width: 640px) {
+  .video-thumb { width: 120px; height: 68px; }
+  .video-link { margin-right: 10px; }
+}
