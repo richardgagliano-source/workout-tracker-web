@@ -243,6 +243,45 @@ async function loadExercises(search = "") {
   return await fetchJSON(`/rest/v1/exercises?${params.toString()}`);
 }
 
+
+// --- YouTube helper (for exercise video thumbnails) ---
+function getYouTubeId(url) {
+  try {
+    const u = new URL(url);
+    // youtu.be/<id>
+    if (u.hostname.includes("youtu.be")) return u.pathname.replace("/", "") || null;
+    // youtube.com/watch?v=<id>
+    if (u.searchParams.get("v")) return u.searchParams.get("v");
+    // youtube.com/shorts/<id>
+    const parts = u.pathname.split("/").filter(Boolean);
+    const shortsIdx = parts.indexOf("shorts");
+    if (shortsIdx >= 0 && parts[shortsIdx + 1]) return parts[shortsIdx + 1];
+    // youtube.com/embed/<id>
+    const embedIdx = parts.indexOf("embed");
+    if (embedIdx >= 0 && parts[embedIdx + 1]) return parts[embedIdx + 1];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function renderVideoThumb(url) {
+  if (!url) return "";
+  const id = getYouTubeId(url);
+  if (!id) {
+    // Non-YouTube link fallback
+    const safe = String(url).replace(/"/g, "&quot;");
+    return `<a class="videoLink" href="${safe}" target="_blank" rel="noopener noreferrer">Video</a>`;
+  }
+  const thumb = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+  const safeUrl = String(url).replace(/"/g, "&quot;");
+  return `
+    <a class="videoThumb" style="display:inline-block;" href="${safeUrl}" target="_blank" rel="noopener noreferrer" title="Open video">
+      <img src="${thumb}" alt="Video thumbnail" loading="lazy" style="width: 180px; max-width: 100%; height: auto; border-radius: 12px; margin-top: 8px; display: block;" />
+    </a>
+  `;
+}
+
 $("exerciseSearch").addEventListener("input", async () => {
   const term = $("exerciseSearch").value.trim();
   const list = $("exerciseList");
@@ -439,7 +478,7 @@ await fetchJSON("/rest/v1/exercises", {
         (ex || []).slice(0, 80).forEach((e) => {
           const card = document.createElement("div");
           card.className = "item";
-          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.video_link || ""} - ${e.equipment || ""}</div>`;
+          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>${renderVideoThumb(e.video_link)}`;
           list.appendChild(card);
         });
         if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
@@ -578,308 +617,308 @@ function refreshStartWorkoutDropdown() {
 }
 
 async function refreshTemplates() {
-  const list = $("templatesList");
-  list.innerHTML = "Loading...";
-
-  let userId;
-  try {
-    userId = getUserIdOrThrow();
-  } catch {
-    list.innerHTML = `<div class="muted">Not signed in.</div>`;
-    return;
-  }
-
-  try {
-    cachedTemplates = await loadTemplatesFull(userId);
-  } catch (err) {
-    console.error("Templates load failed:", err);
-    list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
-    return;
-  }
-
-  refreshStartWorkoutDropdown();
-
-  list.innerHTML = "";
-  if (!cachedTemplates.length) {
-    list.innerHTML = `<div class="muted">No programs yet. Add one, bb!.</div>`;
-    return;
-  }
-
-  for (const t of cachedTemplates) {
-    const card = document.createElement("div");
-    card.className = "item";
-
-    // Header row
-    const header = document.createElement("div");
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.justifyContent = "space-between";
-    header.style.gap = "12px";
-    header.style.cursor = "pointer";
-
-    const left = document.createElement("div");
-
-    const h = document.createElement("h3");
-    h.style.margin = "0";
-    h.textContent = t.name;
-
-    const meta = document.createElement("div");
-    meta.className = "small";
-    const exCount = (t.workout_template_exercises || []).length;
-    meta.textContent = `${exCount} exercise${exCount === 1 ? "" : "s"}`;
-
-    left.appendChild(h);
-    left.appendChild(meta);
-
-    const chevron = document.createElement("div");
-    chevron.className = "small";
-
-    header.appendChild(left);
-    header.appendChild(chevron);
-
-    // Details
-    const details = document.createElement("div");
-    details.className = "stack";
-
-    const isOpen = openProgramIds.has(t.id);
-    if (!isOpen) details.classList.add("hidden");
-    chevron.textContent = isOpen ? "Hide ▴" : "Show ▾";
-
-    const current = (t.workout_template_exercises || [])
-      .slice()
-      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-
-    // exercise list
-    const ul = document.createElement("div");
-    ul.className = "stack";
-
-    current.forEach((x, idx) => {
-      const row = document.createElement("div");
-      row.className = "item";
-      row.style.display = "flex";
-      row.style.alignItems = "center";
-      row.style.justifyContent = "space-between";
-      row.style.gap = "12px";
-
-      const name = x.exercises?.name || "Exercise";
-      const leftText = document.createElement("div");
-      leftText.innerHTML = `<b>${idx + 1}.</b> ${name}`;
-
-      const actions = document.createElement("div");
-      actions.style.display = "flex";
-      actions.style.gap = "8px";
-
-      // UP button
-      const up = document.createElement("button");
-      up.className = "secondary";
-      up.textContent = "↑";
-      up.disabled = idx === 0;
-
-      // DOWN button  ✅ (this is what you were missing)
-      const down = document.createElement("button");
-      down.className = "secondary";
-      down.textContent = "↓";
-      down.disabled = idx === current.length - 1;
-
-      // temp swap helper
-      const TEMP = -999999;
-
-      up.onclick = async (e) => {
-        e.stopPropagation();
-        const above = current[idx - 1];
-        const me = x;
-        if (!above) return;
-
-        const a = above.order_index ?? (idx - 1);
-        const b = me.order_index ?? idx;
-
-        // above -> TEMP
-        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", above.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // me -> a
-        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // above(TEMP) -> b
-        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
-
-      down.onclick = async (e) => {
-        e.stopPropagation();
-        const below = current[idx + 1];
-        const me = x;
-        if (!below) return;
-
-        const a = below.order_index ?? (idx + 1);
-        const b = me.order_index ?? idx;
-
-        // below -> TEMP
-        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", below.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // me -> a
-        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        // below(TEMP) -> b
-        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
-        if (res.error) { alert("Move failed: " + res.error.message); return; }
-
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
-
-      const del = document.createElement("button");
-      del.className = "secondary";
-      del.textContent = "Remove";
-      del.onclick = async (e) => {
-        e.stopPropagation();
-        const ok = confirm("Remove this exercise from the program?");
-        if (!ok) return;
-
-        const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
-        if (error) alert(error.message);
-
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
-
-      actions.append(up, down, del);
-      row.append(leftText, actions);
-      ul.appendChild(row);
-    });
-
-    // search to add
-    const search = document.createElement("input");
-    search.placeholder = "Search exercises to add…";
-    search.value = programSearchTerms.get(t.id) || "";
-
-    const results = document.createElement("div");
-    results.className = "stack";
-
-    let searchReqId = 0;
-    let searchTimer = null;
-
-    search.addEventListener("input", (e) => {
-      e.stopPropagation();
-      clearTimeout(searchTimer);
-
-      searchTimer = setTimeout(async () => {
-        const term = search.value.trim();
-        programSearchTerms.set(t.id, term);
-
-        results.innerHTML = "";
-        if (term.length < 2) return;
-
-        const myReqId = ++searchReqId;
-
-        let ex = [];
-        try {
-          ex = await loadExercises(term);
-        } catch (err) {
-          console.error(err);
-          results.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
-          return;
-        }
-
-        if (myReqId !== searchReqId) return;
-
-        const seen = new Set();
-        (ex || []).slice(0, 10).forEach((exRow) => {
-          if (!exRow?.id || seen.has(exRow.id)) return;
-          seen.add(exRow.id);
-
-          const b = document.createElement("button");
-          b.className = "secondary";
-          b.textContent = `Add: ${exRow.name}`;
-
-          b.onclick = async (ev) => {
-            ev.stopPropagation();
-
-            const already = current.some((r) => r.exercise_id === exRow.id);
-            if (already) { alert("That exercise is already in this program."); return; }
-
-            const { data: lastRow, error: lastErr } = await sb
-              .from("workout_template_exercises")
-              .select("order_index")
-              .eq("template_id", t.id)
-              .order("order_index", { ascending: false })
-              .limit(1);
-
-            if (lastErr) { alert(lastErr.message); return; }
-
-            const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
-
-            const { error: insErr } = await sb.from("workout_template_exercises").insert({
-              template_id: t.id,
-              exercise_id: exRow.id,
-              order_index: nextIndex,
-            });
-
-            if (insErr) { alert(insErr.message); return; }
-
-            openProgramIds.add(t.id);
-            lastProgramFocusId = t.id;
-            await refreshTemplates();
-          };
-
-          results.appendChild(b);
-        });
-      }, 120);
-    });
-
-    // Keep the program open + keep search/results after refresh
-    if (isOpen && search.value.trim().length >= 2) {
-      search.dispatchEvent(new Event("input"));
-    }
-    if (lastProgramFocusId === t.id) {
-      setTimeout(() => search.focus(), 0);
-      lastProgramFocusId = null;
-    }
-
-    const delTpl = document.createElement("button");
-    delTpl.className = "secondary";
-    delTpl.textContent = "Delete program";
-    delTpl.onclick = async (e) => {
-      e.stopPropagation();
-      if (!confirm("Delete this program?")) return;
-
-      const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
-      if (error) alert(error.message);
-
-      openProgramIds.delete(t.id);
-      programSearchTerms.delete(t.id);
-      if (lastProgramFocusId === t.id) lastProgramFocusId = null;
-
-      await refreshTemplates();
-    };
-
-    details.append(ul, search, results, delTpl);
-
-    header.addEventListener("click", () => {
-      const isHidden = details.classList.contains("hidden");
-      if (isHidden) {
-        details.classList.remove("hidden");
-        chevron.textContent = "Hide ▴";
-        openProgramIds.add(t.id);
-      } else {
-        details.classList.add("hidden");
-        chevron.textContent = "Show ▾";
-        openProgramIds.delete(t.id);
-      }
-    });
-
-    card.append(header, details);
-    list.appendChild(card);
-  }
+  const list = $("templatesList");
+  list.innerHTML = "Loading...";
+
+  let userId;
+  try {
+    userId = getUserIdOrThrow();
+  } catch {
+    list.innerHTML = `<div class="muted">Not signed in.</div>`;
+    return;
+  }
+
+  try {
+    cachedTemplates = await loadTemplatesFull(userId);
+  } catch (err) {
+    console.error("Templates load failed:", err);
+    list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
+    return;
+  }
+
+  refreshStartWorkoutDropdown();
+
+  list.innerHTML = "";
+  if (!cachedTemplates.length) {
+    list.innerHTML = `<div class="muted">No programs yet. Add one, bb!.</div>`;
+    return;
+  }
+
+  for (const t of cachedTemplates) {
+    const card = document.createElement("div");
+    card.className = "item";
+
+    // Header row
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+    header.style.gap = "12px";
+    header.style.cursor = "pointer";
+
+    const left = document.createElement("div");
+
+    const h = document.createElement("h3");
+    h.style.margin = "0";
+    h.textContent = t.name;
+
+    const meta = document.createElement("div");
+    meta.className = "small";
+    const exCount = (t.workout_template_exercises || []).length;
+    meta.textContent = `${exCount} exercise${exCount === 1 ? "" : "s"}`;
+
+    left.appendChild(h);
+    left.appendChild(meta);
+
+    const chevron = document.createElement("div");
+    chevron.className = "small";
+
+    header.appendChild(left);
+    header.appendChild(chevron);
+
+    // Details
+    const details = document.createElement("div");
+    details.className = "stack";
+
+    const isOpen = openProgramIds.has(t.id);
+    if (!isOpen) details.classList.add("hidden");
+    chevron.textContent = isOpen ? "Hide ▴" : "Show ▾";
+
+    const current = (t.workout_template_exercises || [])
+      .slice()
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+    // exercise list
+    const ul = document.createElement("div");
+    ul.className = "stack";
+
+    current.forEach((x, idx) => {
+      const row = document.createElement("div");
+      row.className = "item";
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.justifyContent = "space-between";
+      row.style.gap = "12px";
+
+      const name = x.exercises?.name || "Exercise";
+      const leftText = document.createElement("div");
+      leftText.innerHTML = `<b>${idx + 1}.</b> ${name}`;
+
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.gap = "8px";
+
+      // UP button
+      const up = document.createElement("button");
+      up.className = "secondary";
+      up.textContent = "↑";
+      up.disabled = idx === 0;
+
+      // DOWN button  ✅ (this is what you were missing)
+      const down = document.createElement("button");
+      down.className = "secondary";
+      down.textContent = "↓";
+      down.disabled = idx === current.length - 1;
+
+      // temp swap helper
+      const TEMP = -999999;
+
+      up.onclick = async (e) => {
+        e.stopPropagation();
+        const above = current[idx - 1];
+        const me = x;
+        if (!above) return;
+
+        const a = above.order_index ?? (idx - 1);
+        const b = me.order_index ?? idx;
+
+        // above -> TEMP
+        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // me -> a
+        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // above(TEMP) -> b
+        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
+
+      down.onclick = async (e) => {
+        e.stopPropagation();
+        const below = current[idx + 1];
+        const me = x;
+        if (!below) return;
+
+        const a = below.order_index ?? (idx + 1);
+        const b = me.order_index ?? idx;
+
+        // below -> TEMP
+        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // me -> a
+        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // below(TEMP) -> b
+        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
+
+      const del = document.createElement("button");
+      del.className = "secondary";
+      del.textContent = "Remove";
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        const ok = confirm("Remove this exercise from the program?");
+        if (!ok) return;
+
+        const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
+        if (error) alert(error.message);
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
+
+      actions.append(up, down, del);
+      row.append(leftText, actions);
+      ul.appendChild(row);
+    });
+
+    // search to add
+    const search = document.createElement("input");
+    search.placeholder = "Search exercises to add…";
+    search.value = programSearchTerms.get(t.id) || "";
+
+    const results = document.createElement("div");
+    results.className = "stack";
+
+    let searchReqId = 0;
+    let searchTimer = null;
+
+    search.addEventListener("input", (e) => {
+      e.stopPropagation();
+      clearTimeout(searchTimer);
+
+      searchTimer = setTimeout(async () => {
+        const term = search.value.trim();
+        programSearchTerms.set(t.id, term);
+
+        results.innerHTML = "";
+        if (term.length < 2) return;
+
+        const myReqId = ++searchReqId;
+
+        let ex = [];
+        try {
+          ex = await loadExercises(term);
+        } catch (err) {
+          console.error(err);
+          results.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
+          return;
+        }
+
+        if (myReqId !== searchReqId) return;
+
+        const seen = new Set();
+        (ex || []).slice(0, 10).forEach((exRow) => {
+          if (!exRow?.id || seen.has(exRow.id)) return;
+          seen.add(exRow.id);
+
+          const b = document.createElement("button");
+          b.className = "secondary";
+          b.textContent = `Add: ${exRow.name}`;
+
+          b.onclick = async (ev) => {
+            ev.stopPropagation();
+
+            const already = current.some((r) => r.exercise_id === exRow.id);
+            if (already) { alert("That exercise is already in this program."); return; }
+
+            const { data: lastRow, error: lastErr } = await sb
+              .from("workout_template_exercises")
+              .select("order_index")
+              .eq("template_id", t.id)
+              .order("order_index", { ascending: false })
+              .limit(1);
+
+            if (lastErr) { alert(lastErr.message); return; }
+
+            const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+
+            const { error: insErr } = await sb.from("workout_template_exercises").insert({
+              template_id: t.id,
+              exercise_id: exRow.id,
+              order_index: nextIndex,
+            });
+
+            if (insErr) { alert(insErr.message); return; }
+
+            openProgramIds.add(t.id);
+            lastProgramFocusId = t.id;
+            await refreshTemplates();
+          };
+
+          results.appendChild(b);
+        });
+      }, 120);
+    });
+
+    // Keep the program open + keep search/results after refresh
+    if (isOpen && search.value.trim().length >= 2) {
+      search.dispatchEvent(new Event("input"));
+    }
+    if (lastProgramFocusId === t.id) {
+      setTimeout(() => search.focus(), 0);
+      lastProgramFocusId = null;
+    }
+
+    const delTpl = document.createElement("button");
+    delTpl.className = "secondary";
+    delTpl.textContent = "Delete program";
+    delTpl.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm("Delete this program?")) return;
+
+      const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
+      if (error) alert(error.message);
+
+      openProgramIds.delete(t.id);
+      programSearchTerms.delete(t.id);
+      if (lastProgramFocusId === t.id) lastProgramFocusId = null;
+
+      await refreshTemplates();
+    };
+
+    details.append(ul, search, results, delTpl);
+
+    header.addEventListener("click", () => {
+      const isHidden = details.classList.contains("hidden");
+      if (isHidden) {
+        details.classList.remove("hidden");
+        chevron.textContent = "Hide ▴";
+        openProgramIds.add(t.id);
+      } else {
+        details.classList.add("hidden");
+        chevron.textContent = "Show ▾";
+        openProgramIds.delete(t.id);
+      }
+    });
+
+    card.append(header, details);
+    list.appendChild(card);
+  }
 }
 
 $("createTplBtn").addEventListener("click", async () => {
@@ -1443,58 +1482,58 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
 // History (last 20 workouts summary)
 // --------------------
 function historyFilterToQuery(filterValue) {
-  // returns { limit, performedAfterISO } where performedAfterISO can be null
-  const now = new Date();
+  // returns { limit, performedAfterISO } where performedAfterISO can be null
+  const now = new Date();
 
-  if (filterValue === "7d") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 7);
-    return { limit: 5000, performedAfterISO: d.toISOString() };
-  }
+  if (filterValue === "7d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 7);
+    return { limit: 5000, performedAfterISO: d.toISOString() };
+  }
 
-  if (filterValue === "30d") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 30);
-    return { limit: 5000, performedAfterISO: d.toISOString() };
-  }
+  if (filterValue === "30d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 30);
+    return { limit: 5000, performedAfterISO: d.toISOString() };
+  }
 
-  if (filterValue === "all") {
-    return { limit: 5000, performedAfterISO: null };
-  }
+  if (filterValue === "all") {
+    return { limit: 5000, performedAfterISO: null };
+  }
 
-  // numeric limits like "20", "50", "200"
-  const limit = Number(filterValue);
-  return { limit: Number.isFinite(limit) ? limit : 20, performedAfterISO: null };
+  // numeric limits like "20", "50", "200"
+  const limit = Number(filterValue);
+  return { limit: Number.isFinite(limit) ? limit : 20, performedAfterISO: null };
 }
 
 async function loadHistory(userId, filterValue) {
-  const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
+  const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
 
-  const params = new URLSearchParams();
-  params.set("select", "id,performed_at,notes");
-  params.set("user_id", `eq.${userId}`);
-  params.set("order", "performed_at.desc");
-  params.set("limit", String(limit));
+  const params = new URLSearchParams();
+  params.set("select", "id,performed_at,notes");
+  params.set("user_id", `eq.${userId}`);
+  params.set("order", "performed_at.desc");
+  params.set("limit", String(limit));
 
-  if (performedAfterISO) {
-    params.set("performed_at", `gte.${performedAfterISO}`);
-  }
+  if (performedAfterISO) {
+    params.set("performed_at", `gte.${performedAfterISO}`);
+  }
 
-  const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
-  if (!workouts.length) return [];
+  const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
+  if (!workouts.length) return [];
 
-  const ids = workouts.map((w) => w.id).join(",");
+  const ids = workouts.map((w) => w.id).join(",");
 
-  const weParams = new URLSearchParams();
-  weParams.set("select", "workout_id");
-  weParams.set("workout_id", `in.(${ids})`);
+  const weParams = new URLSearchParams();
+  weParams.set("select", "workout_id");
+  weParams.set("workout_id", `in.(${ids})`);
 
-  const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
+  const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
 
-  const counts = new Map();
-  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
+  const counts = new Map();
+  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
 
-  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
+  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
 }
 
 async function refreshHistory() {
