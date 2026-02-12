@@ -177,7 +177,7 @@ function renderUserBar(user) {
 async function loadExercises(search = "") {
   const term = search.trim();
   const params = new URLSearchParams();
-  params.set("select", "id,name,primary_muscle,equipment");
+  params.set("select", "id,name,primary_muscle,equipment,video_link");
   params.set("order", "name.asc");
   params.set("limit", "80");
   if (term) params.set("name", `ilike.*${term.replaceAll("*", "")}*`);
