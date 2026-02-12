@@ -599,10 +599,6 @@ cachedTemplates = await loadTemplatesFull(userId);
       actions.style.display = "flex";
       actions.style.gap = "8px";
 
-      const up = document.createElement("button");
-      up.className = "secondary";
-      up.textContent = "↑";
-      up.disabled = idx === 0;
 up.onclick = async (e) => {
   e.stopPropagation();
   const above = current[idx - 1];
@@ -648,7 +644,7 @@ down.onclick = async (e) => {
   if (e2) { alert("Move failed: " + e2.message); return; }
 
   await refreshTemplates({ openTemplateId: t.id });
-};
+};;
 
       const del = document.createElement("button");
       del.className = "secondary";
