@@ -601,87 +601,72 @@ async function refreshTemplates() {
       actions.style.display = "flex";
       actions.style.gap = "8px";
 
-      // ---- UP button (define it BEFORE using it) ----
+      // UP button
       const up = document.createElement("button");
       up.className = "secondary";
       up.textContent = "↑";
       up.disabled = idx === 0;
-// ---- UP handler ----
-up.onclick = async (e) => {
-  e.stopPropagation();
-  const above = current[idx - 1];
-  const me = x;
-  if (!above) return;
 
-  // compute current positions (fallback to index if missing)
-  const a = above.order_index ?? (idx - 1);
-  const b = me.order_index ?? idx;
+      // DOWN button  ✅ (this is what you were missing)
+      const down = document.createElement("button");
+      down.className = "secondary";
+      down.textContent = "↓";
+      down.disabled = idx === current.length - 1;
 
-  // temp value unlikely to exist
-  const TEMP = -999999;
+      // temp swap helper
+      const TEMP = -999999;
 
-  // step 1: set the above row to TEMP
-  let res = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: TEMP })
-    .eq("id", above.id);
-  if (res.error) { alert("Move failed: " + res.error.message); return; }
+      up.onclick = async (e) => {
+        e.stopPropagation();
+        const above = current[idx - 1];
+        const me = x;
+        if (!above) return;
 
-  // step 2: set me to above's original position (a)
-  res = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: a })
-    .eq("id", me.id);
-  if (res.error) { alert("Move failed: " + res.error.message); return; }
+        const a = above.order_index ?? (idx - 1);
+        const b = me.order_index ?? idx;
 
-  // step 3: set TEMP row to my original position (b)
-  res = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: b })
-    .eq("id", above.id);
-  if (res.error) { alert("Move failed: " + res.error.message); return; }
+        // above -> TEMP
+        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-  openProgramIds.add(t.id);
-  lastProgramFocusId = t.id;
-  await refreshTemplates();
-};
+        // me -> a
+        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-// ---- DOWN handler ----
-down.onclick = async (e) => {
-  e.stopPropagation();
-  const below = current[idx + 1];
-  const me = x;
-  if (!below) return;
+        // above(TEMP) -> b
+        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-  const a = below.order_index ?? (idx + 1);
-  const b = me.order_index ?? idx;
-  const TEMP = -999999;
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
 
-  // temp the below row
-  let res = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: TEMP })
-    .eq("id", below.id);
-  if (res.error) { alert("Move failed: " + res.error.message); return; }
+      down.onclick = async (e) => {
+        e.stopPropagation();
+        const below = current[idx + 1];
+        const me = x;
+        if (!below) return;
 
-  // move me into below's original spot
-  res = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: a })
-    .eq("id", me.id);
-  if (res.error) { alert("Move failed: " + res.error.message); return; }
+        const a = below.order_index ?? (idx + 1);
+        const b = me.order_index ?? idx;
 
-  // move the TEMP row into my original spot
-  res = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: b })
-    .eq("id", below.id);
-  if (res.error) { alert("Move failed: " + res.error.message); return; }
+        // below -> TEMP
+        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-  openProgramIds.add(t.id);
-  lastProgramFocusId = t.id;
-  await refreshTemplates();
-};
+        // me -> a
+        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // below(TEMP) -> b
+        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
 
       const del = document.createElement("button");
       del.className = "secondary";
@@ -691,11 +676,7 @@ down.onclick = async (e) => {
         const ok = confirm("Remove this exercise from the program?");
         if (!ok) return;
 
-        const { error } = await sb
-          .from("workout_template_exercises")
-          .delete()
-          .eq("id", x.id);
-
+        const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
         if (error) alert(error.message);
 
         openProgramIds.add(t.id);
@@ -769,13 +750,11 @@ down.onclick = async (e) => {
 
             const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
 
-            const { error: insErr } = await sb
-              .from("workout_template_exercises")
-              .insert({
-                template_id: t.id,
-                exercise_id: exRow.id,
-                order_index: nextIndex,
-              });
+            const { error: insErr } = await sb.from("workout_template_exercises").insert({
+              template_id: t.id,
+              exercise_id: exRow.id,
+              order_index: nextIndex,
+            });
 
             if (insErr) { alert(insErr.message); return; }
 
