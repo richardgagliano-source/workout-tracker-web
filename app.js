@@ -41,6 +41,30 @@ function withTimeout(promise, ms, label = "Operation") {
 }
 
 
+
+function hasVideoLink(e) {
+  const v = (e?.video_link ?? "").toString().trim();
+  return v.length > 0;
+}
+
+function renderExerciseCard(e) {
+  const card = document.createElement("div");
+  card.className = "item";
+
+  const name = e?.name || "Exercise";
+  const equipment = (e?.equipment ?? "").toString().trim();
+  const video = (e?.video_link ?? "").toString().trim();
+
+  // Only show what you care about: name, optional equipment, optional video link
+  const eqLine = equipment ? `<div class="small">${equipment}</div>` : "";
+  const videoLine = video
+    ? `<div class="small"><a href="${video}" target="_blank" rel="noopener noreferrer">Video ▶</a></div>`
+    : "";
+
+  card.innerHTML = `<h3>${name}</h3>${eqLine}${videoLine}`;
+  return card;
+}
+
 // --- REST helper (uses user JWT if available) ---
 async function fetchJSON(path, { method = "GET", body } = {}) {
   const controller = new AbortController();
@@ -177,7 +201,7 @@ function renderUserBar(user) {
 async function loadExercises(search = "") {
   const term = search.trim();
   const params = new URLSearchParams();
-  params.set("select", "id,name,primary_muscle,equipment");
+  params.set("select", "id,name,primary_muscle,equipment,video_link");
   params.set("order", "name.asc");
   params.set("limit", "80");
   if (term) params.set("name", `ilike.*${term.replaceAll("*", "")}*`);
@@ -188,21 +212,28 @@ $("exerciseSearch").addEventListener("input", async () => {
   const term = $("exerciseSearch").value.trim();
   const list = $("exerciseList");
   list.innerHTML = "Loading...";
+
   try {
     const ex = await loadExercises(term);
     list.innerHTML = "";
+
     (ex || []).slice(0, 80).forEach((e) => {
-      const card = document.createElement("div");
-      card.className = "item";
-      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
+      list.appendChild(renderExerciseCard(e));
+    });
+
       list.appendChild(card);
     });
-    if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
+
+    if (!ex || ex.length === 0) {
+      list.innerHTML = `<div class="muted">No exercises found.</div>`;
+    }
+
   } catch (err) {
     console.error(err);
     list.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
 });
+
 // ---- Library: Add Exercise UI (insert after exerciseSearch handler) ----
 (function setupAddExerciseUI() {
   const libTab = $("tab-library"); // library tab container
@@ -247,15 +278,16 @@ $("exerciseSearch").addEventListener("input", async () => {
   row.style.display = "flex";
   row.style.gap = "8px";
 
-  const muscleInput = document.createElement("input");
-  muscleInput.placeholder = "Primary muscle (optional)";
-  muscleInput.style.flex = "1";
-  row.appendChild(muscleInput);
-
   const equipInput = document.createElement("input");
   equipInput.placeholder = "Equipment (optional)";
+
+  const videoInput = document.createElement("input");
+  videoInput.placeholder = "Video link (YouTube) optional";
   equipInput.style.flex = "1";
   row.appendChild(equipInput);
+
+  videoInput.style.flex = "1";
+  row.appendChild(videoInput);
 
   form.appendChild(row);
 
@@ -313,50 +345,63 @@ $("exerciseSearch").addEventListener("input", async () => {
   // Save handler
   saveBtn.addEventListener("click", async () => {
     msg.textContent = "";
+
     const name = nameInput.value.trim();
-    const primary_muscle = muscleInput.value.trim() || null;
     const equipment = equipInput.value.trim() || null;
+    const video_link = videoInput.value.trim() || null;
 
     if (!name) {
       msg.textContent = "Please enter a name.";
       return;
     }
 
-    // Make sure user is signed in (RLS requires authenticated)
+    // Must be signed in (your RLS currently expects auth)
     try {
       getUserIdOrThrow();
-    } catch (e) {
+    } catch {
       alert("You must be signed in to add exercises.");
       return;
     }
 
-    // Prevent obvious duplicates: check existing results for same name (case-insensitive)
-    const existing = (await loadExercises(name)).find((e) => (e.name || "").toLowerCase() === name.toLowerCase());
+    // Prevent obvious duplicates (case-insensitive by name)
+    const existing = (await loadExercises(name)).find(
+      (e) => (e.name || "").toLowerCase() === name.toLowerCase()
+    );
     if (existing) {
       msg.textContent = "An exercise with that name already exists.";
       return;
     }
 
-    // Create exercise via REST helper
     try {
-const userId = getUserIdOrThrow();
+      await fetchJSON("/rest/v1/exercises", {
+        method: "POST",
+        body: [
+          {
+            name,
+            primary_muscle: null,
+            equipment,
+            video_link,
+          },
+        ],
+      });
 
-await fetchJSON("/rest/v1/exercises", {
-  method: "POST",
-  body: [{
-    name,
-    primary_muscle: primary_muscle || null,
-    equipment: equipment || null,
-    notes: null,
-    is_system: false,
-    owner_user_id: userId
-  }],
-});
+      msg.textContent = "Saved ✅";
+      nameInput.value = "";
+      equipInput.value = "";
+      videoInput.value = "";
+
+      // Refresh library list
+      $("exerciseSearch").dispatchEvent(new Event("input"));
+    } catch (err) {
+      console.error(err);
+      msg.textContent = `Error: ${String(err.message || err)}`;
+    }
+  });
 
       // Clear form, hide and refresh visible list
       nameInput.value = "";
-      muscleInput.value = "";
       equipInput.value = "";
+      videoInput.value = "";
       form.classList.add("hidden");
       toggleBtn.textContent = "Add exercise";
       msg.textContent = "";
@@ -369,11 +414,8 @@ await fetchJSON("/rest/v1/exercises", {
         const ex = await loadExercises(term);
         list.innerHTML = "";
         (ex || []).slice(0, 80).forEach((e) => {
-          const card = document.createElement("div");
-          card.className = "item";
-          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
-          list.appendChild(card);
-        });
+      list.appendChild(renderExerciseCard(e));
+    });
         if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
       }
       // show success toast-like text briefly
@@ -514,11 +556,15 @@ async function refreshTemplates() {
   list.innerHTML = "Loading...";
 
   let userId;
-  try { userId = getUserIdOrThrow(); }
-  catch { list.innerHTML = `<div class="muted">Not signed in.</div>`; return; }
+  try {
+    userId = getUserIdOrThrow();
+  } catch {
+    list.innerHTML = `<div class="muted">Not signed in.</div>`;
+    return;
+  }
 
   try {
-cachedTemplates = await loadTemplatesFull(userId);
+    cachedTemplates = await loadTemplatesFull(userId);
   } catch (err) {
     console.error("Templates load failed:", err);
     list.innerHTML = `<div class="muted">Error loading templates: ${String(err.message || err)}</div>`;
@@ -551,7 +597,6 @@ cachedTemplates = await loadTemplatesFull(userId);
     h.style.margin = "0";
     h.textContent = t.name;
 
-
     const meta = document.createElement("div");
     meta.className = "small";
     const exCount = (t.workout_template_exercises || []).length;
@@ -562,12 +607,11 @@ cachedTemplates = await loadTemplatesFull(userId);
 
     const chevron = document.createElement("div");
     chevron.className = "small";
-    chevron.textContent = "Show ▾";
 
     header.appendChild(left);
     header.appendChild(chevron);
 
-    // Details hidden
+    // Details
     const details = document.createElement("div");
     details.className = "stack";
 
@@ -599,62 +643,84 @@ cachedTemplates = await loadTemplatesFull(userId);
       actions.style.display = "flex";
       actions.style.gap = "8px";
 
-up.onclick = async (e) => {
-  e.stopPropagation();
-  const above = current[idx - 1];
-  const me = x;
-  if (!above) return;
+      // UP button
+      const up = document.createElement("button");
+      up.className = "secondary";
+      up.textContent = "↑";
+      up.disabled = idx === 0;
 
-  // Swap using positions (works even if order_index duplicates)
-  const { error: e1 } = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: idx })
-    .eq("id", above.id);
+      // DOWN button  ✅ (this is what you were missing)
+      const down = document.createElement("button");
+      down.className = "secondary";
+      down.textContent = "↓";
+      down.disabled = idx === current.length - 1;
 
-  if (e1) { alert("Move failed: " + e1.message); return; }
+      // temp swap helper
+      const TEMP = -999999;
 
-  const { error: e2 } = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: idx - 1 })
-    .eq("id", me.id);
+      up.onclick = async (e) => {
+        e.stopPropagation();
+        const above = current[idx - 1];
+        const me = x;
+        if (!above) return;
 
-  if (e2) { alert("Move failed: " + e2.message); return; }
+        const a = above.order_index ?? (idx - 1);
+        const b = me.order_index ?? idx;
 
-  await refreshTemplates({ openTemplateId: t.id });
-};
+        // above -> TEMP
+        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-down.onclick = async (e) => {
-  e.stopPropagation();
-  const below = current[idx + 1];
-  const me = x;
-  if (!below) return;
+        // me -> a
+        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-  const { error: e1 } = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: idx })
-    .eq("id", below.id);
+        // above(TEMP) -> b
+        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-  if (e1) { alert("Move failed: " + e1.message); return; }
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
 
-  const { error: e2 } = await sb
-    .from("workout_template_exercises")
-    .update({ order_index: idx + 1 })
-    .eq("id", me.id);
+      down.onclick = async (e) => {
+        e.stopPropagation();
+        const below = current[idx + 1];
+        const me = x;
+        if (!below) return;
 
-  if (e2) { alert("Move failed: " + e2.message); return; }
+        const a = below.order_index ?? (idx + 1);
+        const b = me.order_index ?? idx;
 
-  await refreshTemplates({ openTemplateId: t.id });
-};;
+        // below -> TEMP
+        let res = await sb.from("workout_template_exercises").update({ order_index: TEMP }).eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // me -> a
+        res = await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        // below(TEMP) -> b
+        res = await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
+        if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
+        await refreshTemplates();
+      };
 
       const del = document.createElement("button");
       del.className = "secondary";
       del.textContent = "Remove";
       del.onclick = async (e) => {
         e.stopPropagation();
-        const ok = confirm("Remove this exercise from the template?");
+        const ok = confirm("Remove this exercise from the program?");
         if (!ok) return;
+
         const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
         if (error) alert(error.message);
+
         openProgramIds.add(t.id);
         lastProgramFocusId = t.id;
         await refreshTemplates();
@@ -672,82 +738,79 @@ down.onclick = async (e) => {
 
     const results = document.createElement("div");
     results.className = "stack";
-let searchReqId = 0;
-let searchTimer = null;
 
-search.addEventListener("input", (e) => {
-  e.stopPropagation();
+    let searchReqId = 0;
+    let searchTimer = null;
 
-  clearTimeout(searchTimer);
+    search.addEventListener("input", (e) => {
+      e.stopPropagation();
+      clearTimeout(searchTimer);
 
-  searchTimer = setTimeout(async () => {
-    const term = search.value.trim();
-    results.innerHTML = "";
-      programSearchTerms.set(t.id, term);
-    if (term.length < 2) return;
+      searchTimer = setTimeout(async () => {
+        const term = search.value.trim();
+        programSearchTerms.set(t.id, term);
 
-    const myReqId = ++searchReqId;
+        results.innerHTML = "";
+        if (term.length < 2) return;
 
-    let ex = [];
-    try {
-      ex = await loadExercises(term);
-    } catch (err) {
-      console.error(err);
-      results.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
-      return;
-    }
+        const myReqId = ++searchReqId;
 
-    // If a newer request started after this one, ignore these results
-    if (myReqId !== searchReqId) return;
+        let ex = [];
+        try {
+          ex = await loadExercises(term);
+        } catch (err) {
+          console.error(err);
+          results.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
+          return;
+        }
 
-    // Extra safety: de-dupe by exercise id
-    const seen = new Set();
+        if (myReqId !== searchReqId) return;
 
-    (ex || []).slice(0, 10).forEach((exRow) => {
-      if (!exRow?.id || seen.has(exRow.id)) return;
-      seen.add(exRow.id);
+        const seen = new Set();
+        (ex || []).slice(0, 10).forEach((exRow) => {
+          if (!exRow?.id || seen.has(exRow.id)) return;
+          seen.add(exRow.id);
 
-      const b = document.createElement("button");
-      b.className = "secondary";
-      b.textContent = `Add: ${exRow.name}`;
+          const b = document.createElement("button");
+          b.className = "secondary";
+          b.textContent = `Add: ${exRow.name}`;
 
-      b.onclick = async (ev) => {
-        ev.stopPropagation();
+          b.onclick = async (ev) => {
+            ev.stopPropagation();
 
-        const already = current.some(r => r.exercise_id === exRow.id);
-        if (already) { alert("That exercise is already in this template."); return; }
+            const already = current.some((r) => r.exercise_id === exRow.id);
+            if (already) { alert("That exercise is already in this program."); return; }
 
-        // next order_index = max+1 from DB (avoid collisions)
-        const { data: lastRow, error: lastErr } = await sb
-          .from("workout_template_exercises")
-          .select("order_index")
-          .eq("template_id", t.id)
-          .order("order_index", { ascending: false })
-          .limit(1);
+            const { data: lastRow, error: lastErr } = await sb
+              .from("workout_template_exercises")
+              .select("order_index")
+              .eq("template_id", t.id)
+              .order("order_index", { ascending: false })
+              .limit(1);
 
-        if (lastErr) { alert(lastErr.message); return; }
+            if (lastErr) { alert(lastErr.message); return; }
 
-        const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+            const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
 
-        const { error: insErr } = await sb.from("workout_template_exercises").insert({
-          template_id: t.id,
-          exercise_id: exRow.id,
-          order_index: nextIndex,
+            const { error: insErr } = await sb.from("workout_template_exercises").insert({
+              template_id: t.id,
+              exercise_id: exRow.id,
+              order_index: nextIndex,
+            });
+
+            if (insErr) { alert(insErr.message); return; }
+
+            openProgramIds.add(t.id);
+            lastProgramFocusId = t.id;
+            await refreshTemplates();
+          };
+
+          results.appendChild(b);
         });
-
-        if (insErr) { alert(insErr.message); return; }
-
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
-
-      results.appendChild(b);
+      }, 120);
     });
-  }, 120);
-});
 
-    // Keep the program open (and keep your search) after refresh
+    // Keep the program open + keep search/results after refresh
     if (isOpen && search.value.trim().length >= 2) {
       search.dispatchEvent(new Event("input"));
     }
@@ -756,19 +819,20 @@ search.addEventListener("input", (e) => {
       lastProgramFocusId = null;
     }
 
-
-
     const delTpl = document.createElement("button");
     delTpl.className = "secondary";
     delTpl.textContent = "Delete program";
     delTpl.onclick = async (e) => {
       e.stopPropagation();
-      if (!confirm("Delete this Program, bb?")) return;
+      if (!confirm("Delete this program?")) return;
+
       const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
       if (error) alert(error.message);
+
       openProgramIds.delete(t.id);
       programSearchTerms.delete(t.id);
       if (lastProgramFocusId === t.id) lastProgramFocusId = null;
+
       await refreshTemplates();
     };
 
@@ -1353,58 +1417,58 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
 // History (last 20 workouts summary)
 // --------------------
 function historyFilterToQuery(filterValue) {
-  // returns { limit, performedAfterISO } where performedAfterISO can be null
-  const now = new Date();
+  // returns { limit, performedAfterISO } where performedAfterISO can be null
+  const now = new Date();
 
-  if (filterValue === "7d") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 7);
-    return { limit: 5000, performedAfterISO: d.toISOString() };
-  }
+  if (filterValue === "7d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 7);
+    return { limit: 5000, performedAfterISO: d.toISOString() };
+  }
 
-  if (filterValue === "30d") {
-    const d = new Date(now);
-    d.setDate(d.getDate() - 30);
-    return { limit: 5000, performedAfterISO: d.toISOString() };
-  }
+  if (filterValue === "30d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 30);
+    return { limit: 5000, performedAfterISO: d.toISOString() };
+  }
 
-  if (filterValue === "all") {
-    return { limit: 5000, performedAfterISO: null };
-  }
+  if (filterValue === "all") {
+    return { limit: 5000, performedAfterISO: null };
+  }
 
-  // numeric limits like "20", "50", "200"
-  const limit = Number(filterValue);
-  return { limit: Number.isFinite(limit) ? limit : 20, performedAfterISO: null };
+  // numeric limits like "20", "50", "200"
+  const limit = Number(filterValue);
+  return { limit: Number.isFinite(limit) ? limit : 20, performedAfterISO: null };
 }
 
 async function loadHistory(userId, filterValue) {
-  const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
+  const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
 
-  const params = new URLSearchParams();
-  params.set("select", "id,performed_at,notes");
-  params.set("user_id", `eq.${userId}`);
-  params.set("order", "performed_at.desc");
-  params.set("limit", String(limit));
+  const params = new URLSearchParams();
+  params.set("select", "id,performed_at,notes");
+  params.set("user_id", `eq.${userId}`);
+  params.set("order", "performed_at.desc");
+  params.set("limit", String(limit));
 
-  if (performedAfterISO) {
-    params.set("performed_at", `gte.${performedAfterISO}`);
-  }
+  if (performedAfterISO) {
+    params.set("performed_at", `gte.${performedAfterISO}`);
+  }
 
-  const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
-  if (!workouts.length) return [];
+  const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
+  if (!workouts.length) return [];
 
-  const ids = workouts.map((w) => w.id).join(",");
+  const ids = workouts.map((w) => w.id).join(",");
 
-  const weParams = new URLSearchParams();
-  weParams.set("select", "workout_id");
-  weParams.set("workout_id", `in.(${ids})`);
+  const weParams = new URLSearchParams();
+  weParams.set("select", "workout_id");
+  weParams.set("workout_id", `in.(${ids})`);
 
-  const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
+  const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
 
-  const counts = new Map();
-  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
+  const counts = new Map();
+  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
 
-  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
+  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
 }
 
 async function refreshHistory() {
@@ -1616,10 +1680,7 @@ async function refreshAll() {
     const ex = await withTimeout(loadExercises(""), 8000, "loadExercises");
     list.innerHTML = "";
     (ex || []).slice(0, 80).forEach((e) => {
-      const card = document.createElement("div");
-      card.className = "item";
-      card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
-      list.appendChild(card);
+      list.appendChild(renderExerciseCard(e));
     });
   } catch (err) {
     console.error(err);
