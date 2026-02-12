@@ -151,11 +151,18 @@ header.topbar {
 main {
   flex: 1 1 auto;
   overflow: auto;
-  padding: 16px;
+
+  padding-top: 16px;
+  padding-bottom: 16px;
+  padding-left: calc(16px + env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
+
   max-width: 920px;
   margin: 0 auto;
   width: 100%;
+  box-sizing: border-box;
 }
+
 
 /* ==========================================================
    HEADER CONTENT (TITLE + SUBTITLE + HAMBURGER)
