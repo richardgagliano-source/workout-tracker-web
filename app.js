@@ -719,7 +719,7 @@ search.addEventListener("input", (e) => {
 
       results.appendChild(b);
     });
-  }, 200);
+  }, 120);
 });
 
 
