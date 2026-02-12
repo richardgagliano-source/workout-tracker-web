@@ -303,3 +303,25 @@ main {
     text-align: left !important;
   }
 }
+/* ---------- hamburger visibility control ---------- */
+/* hide by default */
+#hamburgerMenu {
+  display: none !important;
+  pointer-events: auto;
+}
+
+/* show when open */
+#hamburgerMenu.open {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+
+/* small safety: ensure hidden/visible states on all screen sizes */
+@media (min-width: 0px) {
+  #hamburgerMenu { display: none !important; }
+  #hamburgerMenu.open { display: flex !important; }
+}
+
+/* make sure background taps can close the menu (click area) */
+.menu-wrap { position: relative; z-index: 9999; }
