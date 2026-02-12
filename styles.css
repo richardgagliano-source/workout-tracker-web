@@ -392,3 +392,49 @@ main {
     --topbar-h: 110px; /* header wraps more on phones */
   }
 }
+/* Make panels able to use remaining height */
+#appSection {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tabs stay fixed at top of the card */
+#appSection .tabs {
+  flex: 0 0 auto;
+}
+
+/* Each panel should fill the remaining space */
+.panel {
+  flex: 1 1 auto;
+  min-height: 0;          /* critical: allows inner scroll areas to work */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Workout tab: let the workout list take the space and scroll */
+#tab-workout #activeWorkout {
+  flex: 1 1 auto;
+  min-height: 0;          /* critical */
+  overflow-y: auto;
+  padding-right: 6px;     /* small gutter so scrollbar doesn't overlap */
+}
+
+/* Make input rows easier to read/tap */
+#tab-workout input {
+  min-height: 42px;
+  font-size: 16px;
+}
+
+/* Make buttons not tiny */
+#tab-workout button {
+  min-height: 42px;
+}
+
+main {
+  min-height: calc(100vh - 90px); /* adjust 90px if your header is taller */
+}
+
+#appSection.card {
+  height: calc(100vh - 120px);    /* adjust if needed */
+  overflow: hidden;
+}
