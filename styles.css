@@ -253,3 +253,26 @@ main {
   width: 100%;
   text-align: left;
 }
+/* Force hamburger dropdown to be vertical */
+#hamburgerMenu {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 10px;
+}
+
+/* Force the Signed-in area to be vertical */
+#hamburgerMenu #userBar {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 8px;
+}
+
+/* Make items full-width */
+#hamburgerMenu .menu-item,
+#hamburgerMenu #userBar button {
+  width: 100%;
+  text-align: left;
+  display: block;
+}
