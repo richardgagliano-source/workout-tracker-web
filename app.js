@@ -53,11 +53,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  btn.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleHamburger();
-  });
+const onToggle = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  toggleHamburger();
+};
+
+btn.addEventListener("click", onToggle);
+btn.addEventListener("touchend", onToggle, { passive: false });
+
 
   // Close when tapping outside
   document.addEventListener("click", (e) => {
