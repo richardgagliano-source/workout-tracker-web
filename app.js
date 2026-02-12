@@ -175,59 +175,6 @@ function bestSet(sets) {
   }
   return best;
 }
-// ===== video thumbnail helpers =====
-function extractYouTubeId(url) {
-  if (!url) return null;
-  try {
-    url = url.trim();
-    if (/^[A-Za-z0-9_-]{11}$/.test(url)) return url;
-    const u = new URL(url, "https://example.com");
-    const host = u.hostname.toLowerCase();
-    if (host.includes("youtu.be")) {
-      return u.pathname.split("/").filter(Boolean)[0] || null;
-    }
-    if (host.includes("youtube.com")) {
-      return u.searchParams.get("v") || null;
-    }
-    const m = u.pathname.match(/\/embed\/([A-Za-z0-9_-]{11})/);
-    if (m) return m[1];
-    return null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function youtubeThumbnailHtml(url, altText = "") {
-  const id = extractYouTubeId(url);
-  if (!id) return null;
-  const thumb = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-  return `<img class="video-thumb" src="${thumb}" alt="${escapeHtml(altText)}" />`;
-}
-
-function escapeHtml(s) {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-
-function youtubeThumbnailHtml(url, altText = "") {
-  const id = extractYouTubeId(url);
-  if (!id) return null;
-  // high quality thumb
-  const thumb = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-  return `<img class="video-thumb" src="${thumb}" alt="${escapeHtml(altText)}" />`;
-}
-
-function escapeHtml(s) {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 // --------------------
 // Tabs UI
