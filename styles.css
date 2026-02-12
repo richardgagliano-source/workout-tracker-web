@@ -249,3 +249,6 @@ main {
   min-height: 0;
   overflow: auto;
 }
+#tab-history {
+  min-height: 0;
+}
