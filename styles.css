@@ -438,3 +438,84 @@ main {
   height: calc(100vh - 120px);    /* adjust if needed */
   overflow: hidden;
 }
+/* ================================
+   Option B: Tabs in hamburger + whole main scrolls
+   ================================ */
+
+/* Main layout: header stays, everything below scrolls */
+html, body { height: 100%; }
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;            /* no page scroll bar on body */
+}
+
+header.topbar { flex: 0 0 auto; }
+
+main {
+  flex: 1 1 auto;
+  overflow: auto;              /* ✅ the whole app area scrolls */
+  padding: 16px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+/* Turn OFF the old “inner list scroll” setup if you added it earlier */
+#appSection.card,
+#appSection .panel,
+#templatesList,
+#exerciseList,
+#historyList,
+#historyDetail,
+#progressView,
+#progressSearchResults,
+#activeWorkout {
+  overflow: visible !important;
+  min-height: auto !important;
+  flex: initial !important;
+}
+
+/* Hide the old tab row (we still keep it in DOM for app.js logic) */
+.tabs-hidden { display: none !important; }
+
+/* Hamburger menu UI */
+.menu-wrap { position: relative; }
+.icon-btn {
+  font-size: 22px;
+  line-height: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: 48px;
+  min-width: 260px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(18, 26, 38, 0.98);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  z-index: 999;
+}
+
+.menu-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.menu-item:hover {
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+}
+
+.menu-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.10);
+  margin: 10px 0;
+}
