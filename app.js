@@ -1615,7 +1615,21 @@ header.append(title, actions);
   detail.appendChild(wrap);
 }
 $("historyFilter")?.addEventListener("change", refreshHistory);
+const menuToggle = document.getElementById("menuToggle");
+const menuDropdown = document.getElementById("menuDropdown");
 
+if (menuToggle && menuDropdown) {
+  menuToggle.addEventListener("click", () => {
+    menuDropdown.classList.toggle("hidden");
+  });
+
+  // Close menu if clicking outside
+  document.addEventListener("click", (e) => {
+    if (!menuDropdown.contains(e.target) && !menuToggle.contains(e.target)) {
+      menuDropdown.classList.add("hidden");
+    }
+  });
+}
 // --------------------
 // Bootstrap / refreshAll
 // --------------------
