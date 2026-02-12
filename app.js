@@ -199,7 +199,179 @@ $("exerciseSearch").addEventListener("input", async () => {
     list.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
 });
+// ---- Library: Add Exercise UI (insert after exerciseSearch handler) ----
+(function setupAddExerciseUI() {
+  const libTab = $("tab-library"); // library tab container
+  if (!libTab) return; // safety
 
+  // Create a small container above the search/results area
+  const addWrap = document.createElement("div");
+  addWrap.className = "item";
+  addWrap.style.display = "flex";
+  addWrap.style.flexDirection = "column";
+  addWrap.style.gap = "8px";
+  addWrap.style.marginBottom = "12px";
+
+  // Header row with button
+  const headerRow = document.createElement("div");
+  headerRow.style.display = "flex";
+  headerRow.style.justifyContent = "space-between";
+  headerRow.style.alignItems = "center";
+  headerRow.style.gap = "12px";
+
+  const title = document.createElement("div");
+  title.innerHTML = `<b>Add new exercise</b>`;
+  headerRow.appendChild(title);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.className = "secondary";
+  toggleBtn.type = "button";
+  toggleBtn.textContent = "Add exercise";
+  headerRow.appendChild(toggleBtn);
+
+  // Form (hidden by default)
+  const form = document.createElement("div");
+  form.className = "stack hidden";
+  form.style.padding = "8px 0";
+
+  const nameInput = document.createElement("input");
+  nameInput.placeholder = "Exercise name (required)";
+  nameInput.style.width = "100%";
+  form.appendChild(nameInput);
+
+  const row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.gap = "8px";
+
+  const muscleInput = document.createElement("input");
+  muscleInput.placeholder = "Primary muscle (optional)";
+  muscleInput.style.flex = "1";
+  row.appendChild(muscleInput);
+
+  const equipInput = document.createElement("input");
+  equipInput.placeholder = "Equipment (optional)";
+  equipInput.style.flex = "1";
+  row.appendChild(equipInput);
+
+  form.appendChild(row);
+
+  const actions = document.createElement("div");
+  actions.style.display = "flex";
+  actions.style.gap = "8px";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "primary";
+  saveBtn.textContent = "Save";
+  actions.appendChild(saveBtn);
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "secondary";
+  cancelBtn.textContent = "Cancel";
+  actions.appendChild(cancelBtn);
+
+  const msg = document.createElement("div");
+  msg.className = "small muted";
+  form.appendChild(actions);
+  form.appendChild(msg);
+
+  addWrap.appendChild(headerRow);
+  addWrap.appendChild(form);
+
+  // Insert the addWrap at the top of the library tab (before search + results)
+  // If exerciseList exists, insert before it; otherwise append to libTab
+  const exerciseList = $("exerciseList");
+  if (exerciseList && exerciseList.parentNode === libTab) {
+    libTab.insertBefore(addWrap, exerciseList);
+  } else {
+    libTab.appendChild(addWrap);
+  }
+
+  // Toggle show/hide
+  toggleBtn.addEventListener("click", () => {
+    const hidden = form.classList.contains("hidden");
+    if (hidden) {
+      form.classList.remove("hidden");
+      toggleBtn.textContent = "Hide";
+      nameInput.focus();
+    } else {
+      form.classList.add("hidden");
+      toggleBtn.textContent = "Add exercise";
+      msg.textContent = "";
+    }
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    form.classList.add("hidden");
+    toggleBtn.textContent = "Add exercise";
+    msg.textContent = "";
+  });
+
+  // Save handler
+  saveBtn.addEventListener("click", async () => {
+    msg.textContent = "";
+    const name = nameInput.value.trim();
+    const primary_muscle = muscleInput.value.trim() || null;
+    const equipment = equipInput.value.trim() || null;
+
+    if (!name) {
+      msg.textContent = "Please enter a name.";
+      return;
+    }
+
+    // Make sure user is signed in (RLS requires authenticated)
+    try {
+      getUserIdOrThrow();
+    } catch (e) {
+      alert("You must be signed in to add exercises.");
+      return;
+    }
+
+    // Prevent obvious duplicates: check existing results for same name (case-insensitive)
+    const existing = (await loadExercises(name)).find((e) => (e.name || "").toLowerCase() === name.toLowerCase());
+    if (existing) {
+      msg.textContent = "An exercise with that name already exists.";
+      return;
+    }
+
+    // Create exercise via REST helper
+    try {
+      await fetchJSON("/rest/v1/exercises", {
+        method: "POST",
+        body: [{ name, primary_muscle, equipment }],
+      });
+
+      // Clear form, hide and refresh visible list
+      nameInput.value = "";
+      muscleInput.value = "";
+      equipInput.value = "";
+      form.classList.add("hidden");
+      toggleBtn.textContent = "Add exercise";
+      msg.textContent = "";
+
+      // Refresh library results: if there is a search term, re-run it, otherwise reload top list
+      const term = $("exerciseSearch")?.value?.trim() || "";
+      const list = $("exerciseList");
+      if (list) {
+        list.innerHTML = "Loading...";
+        const ex = await loadExercises(term);
+        list.innerHTML = "";
+        (ex || []).slice(0, 80).forEach((e) => {
+          const card = document.createElement("div");
+          card.className = "item";
+          card.innerHTML = `<h3>${e.name}</h3><div class="small">${e.primary_muscle || ""} - ${e.equipment || ""}</div>`;
+          list.appendChild(card);
+        });
+        if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
+      }
+      // show success toast-like text briefly
+      msg.textContent = "Saved!";
+      setTimeout(() => (msg.textContent = ""), 1500);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add exercise: " + String(err.message || err));
+    }
+  });
+})();
 // --------------------
 // Templates (user-owned)
 // --------------------
