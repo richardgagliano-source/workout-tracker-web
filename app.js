@@ -44,10 +44,34 @@ function toggleHamburger() {
   menu.classList.toggle("hidden");
 }
 
-document.getElementById("hamburgerBtn")?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  toggleHamburger();
+// Attach hamburger handlers AFTER the DOM exists (works on iPhone)
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("hamburgerBtn");
+  const menu = document.getElementById("hamburgerMenu");
+  if (!btn || !menu) {
+    console.warn("Hamburger elements not found", { btn, menu });
+    return;
+  }
+
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleHamburger();
+  });
+
+  // Close when tapping outside
+  document.addEventListener("click", (e) => {
+    if (!menu.classList.contains("hidden") && !menu.contains(e.target) && e.target !== btn) {
+      closeHamburger();
+    }
+  });
+
+  // Close after clicking a menu item
+  menu.querySelectorAll(".menu-item").forEach((el) => {
+    el.addEventListener("click", () => closeHamburger());
+  });
 });
+
 
 // Close when clicking outside
 document.addEventListener("click", () => closeHamburger());
