@@ -151,7 +151,9 @@ header, #userBar, .topbar {
 .subtitle {
   font-style: italic;
   font-size: 0.95rem;
-  opacity: 0.8;
+opacity: 0.6;
+letter-spacing: 0.5px;
+
   margin-top: 4px;
 }
 
