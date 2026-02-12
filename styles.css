@@ -298,3 +298,47 @@ main {
   width: 100%;
   margin-top: 10px;
 }
+/* Hamburger user menu */
+.menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.menu-btn {
+  min-width: 56px;
+  height: 44px;
+  padding: 0 18px;
+  font-size: 20px;
+  line-height: 1;
+  border-radius: 12px;
+}
+
+/* dropdown hidden by default */
+.menu-panel {
+  position: absolute;
+  right: 0;
+  top: 52px;
+  min-width: 280px;
+  padding: 12px;
+  border-radius: 12px;
+
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 40px rgba(0,0,0,.45);
+
+  display: none;
+  z-index: 9999;
+}
+
+/* open state */
+.menu.open .menu-panel {
+  display: block;
+}
+
+/* make userBar inside dropdown look nice */
+.menu-panel #userBar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
