@@ -293,3 +293,11 @@ main {
     padding-right: max(16px, env(safe-area-inset-right));
   }
 }
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
