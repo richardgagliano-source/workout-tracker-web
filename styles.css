@@ -276,3 +276,30 @@ main {
   text-align: left;
   display: block;
 }
+/* iPhone/mobile: force hamburger dropdown to stack vertically */
+@media (max-width: 900px) {
+  #hamburgerMenu {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  #hamburgerMenu .menu-item {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+
+  #hamburgerMenu #userBar {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  #hamburgerMenu #userBar button {
+    width: 100% !important;
+    text-align: left !important;
+  }
+}
