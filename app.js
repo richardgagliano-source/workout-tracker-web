@@ -606,65 +606,82 @@ async function refreshTemplates() {
       up.className = "secondary";
       up.textContent = "↑";
       up.disabled = idx === 0;
-      up.onclick = async (e) => {
-        e.stopPropagation();
+// ---- UP handler ----
+up.onclick = async (e) => {
+  e.stopPropagation();
+  const above = current[idx - 1];
+  const me = x;
+  if (!above) return;
 
-        const above = current[idx - 1];
-        const me = x;
-        if (!above) return;
+  // compute current positions (fallback to index if missing)
+  const a = above.order_index ?? (idx - 1);
+  const b = me.order_index ?? idx;
 
-        // swap order_index values
-        const a = above.order_index ?? (idx - 1);
-        const b = me.order_index ?? idx;
+  // temp value unlikely to exist
+  const TEMP = -999999;
 
-        const { error: e1 } = await sb
-          .from("workout_template_exercises")
-          .update({ order_index: b })
-          .eq("id", above.id);
-        if (e1) { alert("Move failed: " + e1.message); return; }
+  // step 1: set the above row to TEMP
+  let res = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: TEMP })
+    .eq("id", above.id);
+  if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-        const { error: e2 } = await sb
-          .from("workout_template_exercises")
-          .update({ order_index: a })
-          .eq("id", me.id);
-        if (e2) { alert("Move failed: " + e2.message); return; }
+  // step 2: set me to above's original position (a)
+  res = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: a })
+    .eq("id", me.id);
+  if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
+  // step 3: set TEMP row to my original position (b)
+  res = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: b })
+    .eq("id", above.id);
+  if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-      // ---- DOWN button (define it BEFORE using it) ----
-      const down = document.createElement("button");
-      down.className = "secondary";
-      down.textContent = "↓";
-      down.disabled = idx === current.length - 1;
-      down.onclick = async (e) => {
-        e.stopPropagation();
+  openProgramIds.add(t.id);
+  lastProgramFocusId = t.id;
+  await refreshTemplates();
+};
 
-        const below = current[idx + 1];
-        const me = x;
-        if (!below) return;
+// ---- DOWN handler ----
+down.onclick = async (e) => {
+  e.stopPropagation();
+  const below = current[idx + 1];
+  const me = x;
+  if (!below) return;
 
-        const a = below.order_index ?? (idx + 1);
-        const b = me.order_index ?? idx;
+  const a = below.order_index ?? (idx + 1);
+  const b = me.order_index ?? idx;
+  const TEMP = -999999;
 
-        const { error: e1 } = await sb
-          .from("workout_template_exercises")
-          .update({ order_index: b })
-          .eq("id", below.id);
-        if (e1) { alert("Move failed: " + e1.message); return; }
+  // temp the below row
+  let res = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: TEMP })
+    .eq("id", below.id);
+  if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-        const { error: e2 } = await sb
-          .from("workout_template_exercises")
-          .update({ order_index: a })
-          .eq("id", me.id);
-        if (e2) { alert("Move failed: " + e2.message); return; }
+  // move me into below's original spot
+  res = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: a })
+    .eq("id", me.id);
+  if (res.error) { alert("Move failed: " + res.error.message); return; }
 
-        openProgramIds.add(t.id);
-        lastProgramFocusId = t.id;
-        await refreshTemplates();
-      };
+  // move the TEMP row into my original spot
+  res = await sb
+    .from("workout_template_exercises")
+    .update({ order_index: b })
+    .eq("id", below.id);
+  if (res.error) { alert("Move failed: " + res.error.message); return; }
+
+  openProgramIds.add(t.id);
+  lastProgramFocusId = t.id;
+  await refreshTemplates();
+};
 
       const del = document.createElement("button");
       del.className = "secondary";
