@@ -163,3 +163,68 @@ letter-spacing: 0.5px;
   align-items: center;
   gap: 12px;
 }
+/* ================================
+   Fixed header + scrollable content
+   ================================ */
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden; /* prevent whole page from scrolling */
+}
+
+/* Make the body layout: header stays, main fills the rest */
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Your top header stays fixed */
+header.topbar {
+  flex: 0 0 auto;
+}
+
+/* Main fills remaining height and does NOT scroll */
+main {
+  flex: 1 1 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The APP card becomes a scroll container host */
+#appSection.card {
+  flex: 1 1 auto;
+  overflow: hidden;           /* important: contains inner scrolling */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;              /* important for flex + overflow */
+}
+
+/* Tabs row stays visible */
+#appSection .tabs {
+  flex: 0 0 auto;
+}
+
+/* Each panel fills remaining space, but doesn't scroll itself */
+#appSection .panel {
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-height: 0;              /* important */
+}
+
+/* The *list area* is what scrolls */
+#templatesList,
+#exerciseList,
+#historyList,
+#historyDetail,
+#progressView,
+#progressSearchResults,
+#activeWorkout {
+  overflow: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
