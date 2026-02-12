@@ -282,7 +282,3 @@ main {
     padding-right: max(16px, env(safe-area-inset-right));
   }
 }
-main {
-  margin-left: auto;
-  margin-right: auto;
-}
