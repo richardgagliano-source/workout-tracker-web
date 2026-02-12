@@ -18,6 +18,10 @@ function getUserIdOrThrow() {
 
 // --- App state ---
 let cachedTemplates = [];
+
+let openProgramIds = new Set();
+let programSearchTerms = new Map(); // template_id -> last search term
+let lastProgramFocusId = null;
 let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
 
 // --- DOM helpers ---
@@ -565,7 +569,11 @@ cachedTemplates = await loadTemplatesFull(userId);
 
     // Details hidden
     const details = document.createElement("div");
-    details.className = "stack hidden";
+    details.className = "stack";
+
+    const isOpen = openProgramIds.has(t.id);
+    if (!isOpen) details.classList.add("hidden");
+    chevron.textContent = isOpen ? "Hide ▴" : "Show ▾";
 
     const current = (t.workout_template_exercises || [])
       .slice()
@@ -606,6 +614,8 @@ cachedTemplates = await loadTemplatesFull(userId);
 
         await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", above.id);
         await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
         await refreshTemplates();
       };
 
@@ -624,6 +634,8 @@ cachedTemplates = await loadTemplatesFull(userId);
 
         await sb.from("workout_template_exercises").update({ order_index: b }).eq("id", below.id);
         await sb.from("workout_template_exercises").update({ order_index: a }).eq("id", me.id);
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
         await refreshTemplates();
       };
 
@@ -636,6 +648,8 @@ cachedTemplates = await loadTemplatesFull(userId);
         if (!ok) return;
         const { error } = await sb.from("workout_template_exercises").delete().eq("id", x.id);
         if (error) alert(error.message);
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
         await refreshTemplates();
       };
 
@@ -647,6 +661,7 @@ cachedTemplates = await loadTemplatesFull(userId);
     // search to add
     const search = document.createElement("input");
     search.placeholder = "Search exercises to add…";
+    search.value = programSearchTerms.get(t.id) || "";
 
     const results = document.createElement("div");
     results.className = "stack";
@@ -661,6 +676,7 @@ search.addEventListener("input", (e) => {
   searchTimer = setTimeout(async () => {
     const term = search.value.trim();
     results.innerHTML = "";
+      programSearchTerms.set(t.id, term);
     if (term.length < 2) return;
 
     const myReqId = ++searchReqId;
@@ -714,6 +730,8 @@ search.addEventListener("input", (e) => {
 
         if (insErr) { alert(insErr.message); return; }
 
+        openProgramIds.add(t.id);
+        lastProgramFocusId = t.id;
         await refreshTemplates();
       };
 
@@ -721,6 +739,16 @@ search.addEventListener("input", (e) => {
     });
   }, 120);
 });
+
+    // Keep the program open (and keep your search) after refresh
+    if (isOpen && search.value.trim().length >= 2) {
+      search.dispatchEvent(new Event("input"));
+    }
+    if (lastProgramFocusId === t.id) {
+      setTimeout(() => search.focus(), 0);
+      lastProgramFocusId = null;
+    }
+
 
 
     const delTpl = document.createElement("button");
@@ -731,6 +759,9 @@ search.addEventListener("input", (e) => {
       if (!confirm("Delete this Program, bb?")) return;
       const { error } = await sb.from("workout_templates").delete().eq("id", t.id);
       if (error) alert(error.message);
+      openProgramIds.delete(t.id);
+      programSearchTerms.delete(t.id);
+      if (lastProgramFocusId === t.id) lastProgramFocusId = null;
       await refreshTemplates();
     };
 
@@ -741,9 +772,11 @@ search.addEventListener("input", (e) => {
       if (isHidden) {
         details.classList.remove("hidden");
         chevron.textContent = "Hide ▴";
+        openProgramIds.add(t.id);
       } else {
         details.classList.add("hidden");
         chevron.textContent = "Show ▾";
+        openProgramIds.delete(t.id);
       }
     });
 
