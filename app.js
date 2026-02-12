@@ -1773,6 +1773,18 @@ sb.auth.onAuthStateChange(async (_event, session) => {
       hide($("authSection"));
       show($("appSection"));
       await refreshAll();
+      // Default to Workout tab on initial load
+document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
+const workoutTabBtn = document.querySelector('.tab[data-tab="workout"]');
+if (workoutTabBtn) workoutTabBtn.classList.add("active");
+
+["templates","workout","library","history","progress"].forEach((t) => {
+  const panel = document.getElementById(`tab-${t}`);
+  if (panel) panel.classList.add("hidden");
+});
+const workoutPanel = document.getElementById("tab-workout");
+if (workoutPanel) workoutPanel.classList.remove("hidden");
+
     } else {
       show($("authSection"));
       hide($("appSection"));
