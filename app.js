@@ -1276,26 +1276,59 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
 // --------------------
 // History (last 20 workouts summary)
 // --------------------
-async function loadHistory(userId) {
-  const params = new URLSearchParams();
-  params.set("select", "id,performed_at,notes");
-  params.set("user_id", `eq.${userId}`);
-  params.set("order", "performed_at.desc");
-  params.set("limit", "20");
+function historyFilterToQuery(filterValue) {
+  // returns { limit, performedAfterISO } where performedAfterISO can be null
+  const now = new Date();
 
-  const workouts = await fetchJSON(`/rest/v1/workouts?${params.toString()}`) || [];
-  if (!workouts.length) return [];
-  const ids = workouts.map((w) => w.id).join(",");
+  if (filterValue === "7d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 7);
+    return { limit: 5000, performedAfterISO: d.toISOString() };
+  }
 
-  const weParams = new URLSearchParams();
-  weParams.set("select", "workout_id");
-  weParams.set("workout_id", `in.(${ids})`);
-  const wes = await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`) || [];
+  if (filterValue === "30d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 30);
+    return { limit: 5000, performedAfterISO: d.toISOString() };
+  }
 
-  const counts = new Map();
-  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
+  if (filterValue === "all") {
+    return { limit: 5000, performedAfterISO: null };
+  }
 
-  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
+  // numeric limits like "20", "50", "200"
+  const limit = Number(filterValue);
+  return { limit: Number.isFinite(limit) ? limit : 20, performedAfterISO: null };
+}
+
+async function loadHistory(userId, filterValue) {
+  const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
+
+  const params = new URLSearchParams();
+  params.set("select", "id,performed_at,notes");
+  params.set("user_id", `eq.${userId}`);
+  params.set("order", "performed_at.desc");
+  params.set("limit", String(limit));
+
+  if (performedAfterISO) {
+    params.set("performed_at", `gte.${performedAfterISO}`);
+  }
+
+  const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
+  if (!workouts.length) return [];
+
+  const ids = workouts.map((w) => w.id).join(",");
+
+  const weParams = new URLSearchParams();
+  weParams.set("select", "workout_id");
+  weParams.set("workout_id", `in.(${ids})`);
+
+  const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
+
+  const counts = new Map();
+  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
+
+  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
 }
 
 async function refreshHistory() {
@@ -1317,7 +1350,8 @@ async function refreshHistory() {
   }
 
   try {
-    const rows = await loadHistory(userId);
+const filterValue = $("historyFilter")?.value || "20"; // whatever you set as default
+const rows = await loadHistory(userId, filterValue);
     host.innerHTML = "";
 
     if (!rows.length) {
@@ -1379,6 +1413,29 @@ async function loadWorkoutDetail(workoutId) {
 
   return { ...data, workout_exercises: wes };
 }
+async function deleteWorkoutCascade(workoutId) {
+  // 1) load workout_exercise ids
+  const weParams = new URLSearchParams();
+  weParams.set("select", "id");
+  weParams.set("workout_id", `eq.${workoutId}`);
+  weParams.set("limit", "5000");
+
+  const weRows = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
+  const weIds = weRows.map((r) => r.id).filter(Boolean);
+
+  // 2) delete sets
+  if (weIds.length) {
+    const setParams = new URLSearchParams();
+    setParams.set("workout_exercise_id", `in.(${weIds.join(",")})`);
+    await fetchJSON(`/rest/v1/sets?${setParams.toString()}`, { method: "DELETE" });
+  }
+
+  // 3) delete workout_exercises
+  await fetchJSON(`/rest/v1/workout_exercises?workout_id=eq.${workoutId}`, { method: "DELETE" });
+
+  // 4) delete workout
+  await fetchJSON(`/rest/v1/workouts?id=eq.${workoutId}`, { method: "DELETE" });
+}
 
 async function showWorkoutDetail(workoutId) {
   const detail = $("historyDetail");
@@ -1410,7 +1467,33 @@ async function showWorkoutDetail(workoutId) {
     detail.innerHTML = "";
   };
 
-  header.append(title, back);
+const actions = document.createElement("div");
+actions.className = "row";
+actions.style.gap = "8px";
+
+const del = document.createElement("button");
+del.className = "secondary";
+del.textContent = "Delete workout";
+del.onclick = async () => {
+  const ok = confirm("Delete this workout from history? This cannot be undone.");
+  if (!ok) return;
+
+  try {
+    await deleteWorkoutCascade(workoutId);
+
+    detail.classList.add("hidden");
+    list.classList.remove("hidden");
+    detail.innerHTML = "";
+
+    await refreshHistory();
+  } catch (e) {
+    console.error(e);
+    alert(`Failed to delete workout: ${String(e.message || e)}`);
+  }
+};
+
+actions.append(del, back);
+header.append(title, actions);
   wrap.appendChild(header);
 
   (w.workout_exercises || []).forEach((we, i) => {
