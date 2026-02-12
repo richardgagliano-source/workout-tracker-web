@@ -30,6 +30,37 @@ const show = (el) => el.classList.remove("hidden");
 const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
+// --------------------
+// Hamburger menu: open/close + tab navigation
+// --------------------
+function closeHamburger() {
+  const menu = document.getElementById("hamburgerMenu");
+  if (menu) menu.classList.add("hidden");
+}
+
+function toggleHamburger() {
+  const menu = document.getElementById("hamburgerMenu");
+  if (!menu) return;
+  menu.classList.toggle("hidden");
+}
+
+document.getElementById("hamburgerBtn")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleHamburger();
+});
+
+// Close when clicking outside
+document.addEventListener("click", () => closeHamburger());
+
+// Use hamburger items to drive your existing tab logic
+document.querySelectorAll(".menu-item[data-tab]").forEach((btn) => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const tab = btn.dataset.tab;
+    document.querySelector(`.tab[data-tab="${tab}"]`)?.click();
+    closeHamburger();
+  });
+});
 // --- Timeout helper (prevents "Loading..." forever) ---
 function withTimeout(promise, ms, label = "Operation") {
   return Promise.race([
