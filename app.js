@@ -650,51 +650,78 @@ cachedTemplates = await loadTemplatesFull(userId);
 
     const results = document.createElement("div");
     results.className = "stack";
+let searchReqId = 0;
+let searchTimer = null;
 
-    search.addEventListener("input", async (e) => {
-      e.stopPropagation();
-      const term = search.value.trim();
-      results.innerHTML = "";
-      if (term.length < 2) return;
+search.addEventListener("input", (e) => {
+  e.stopPropagation();
 
-      const ex = await loadExercises(term);
-      ex.slice(0, 10).forEach((exRow) => {
-        const b = document.createElement("button");
-        b.className = "secondary";
-        b.textContent = `Add: ${exRow.name}`;
+  clearTimeout(searchTimer);
 
-        b.onclick = async (ev) => {
-          ev.stopPropagation();
+  searchTimer = setTimeout(async () => {
+    const term = search.value.trim();
+    results.innerHTML = "";
+    if (term.length < 2) return;
 
-          const already = current.some(r => r.exercise_id === exRow.id);
-          if (already) { alert("That exercise is already in this template."); return; }
+    const myReqId = ++searchReqId;
 
-          // next order_index = max+1 from DB (avoid collisions)
-          const { data: lastRow, error: lastErr } = await sb
-            .from("workout_template_exercises")
-            .select("order_index")
-            .eq("template_id", t.id)
-            .order("order_index", { ascending: false })
-            .limit(1);
+    let ex = [];
+    try {
+      ex = await loadExercises(term);
+    } catch (err) {
+      console.error(err);
+      results.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
+      return;
+    }
 
-          if (lastErr) { alert(lastErr.message); return; }
+    // If a newer request started after this one, ignore these results
+    if (myReqId !== searchReqId) return;
 
-          const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+    // Extra safety: de-dupe by exercise id
+    const seen = new Set();
 
-          const { error: insErr } = await sb.from("workout_template_exercises").insert({
-            template_id: t.id,
-            exercise_id: exRow.id,
-            order_index: nextIndex,
-          });
+    (ex || []).slice(0, 10).forEach((exRow) => {
+      if (!exRow?.id || seen.has(exRow.id)) return;
+      seen.add(exRow.id);
 
-          if (insErr) { alert(insErr.message); return; }
+      const b = document.createElement("button");
+      b.className = "secondary";
+      b.textContent = `Add: ${exRow.name}`;
 
-          await refreshTemplates();
-        };
+      b.onclick = async (ev) => {
+        ev.stopPropagation();
 
-        results.appendChild(b);
-      });
+        const already = current.some(r => r.exercise_id === exRow.id);
+        if (already) { alert("That exercise is already in this template."); return; }
+
+        // next order_index = max+1 from DB (avoid collisions)
+        const { data: lastRow, error: lastErr } = await sb
+          .from("workout_template_exercises")
+          .select("order_index")
+          .eq("template_id", t.id)
+          .order("order_index", { ascending: false })
+          .limit(1);
+
+        if (lastErr) { alert(lastErr.message); return; }
+
+        const nextIndex = (lastRow?.[0]?.order_index ?? -1) + 1;
+
+        const { error: insErr } = await sb.from("workout_template_exercises").insert({
+          template_id: t.id,
+          exercise_id: exRow.id,
+          order_index: nextIndex,
+        });
+
+        if (insErr) { alert(insErr.message); return; }
+
+        await refreshTemplates();
+      };
+
+      results.appendChild(b);
     });
+  }, 200);
+});
+
 
     const delTpl = document.createElement("button");
     delTpl.className = "secondary";
