@@ -335,10 +335,19 @@ $("exerciseSearch").addEventListener("input", async () => {
 
     // Create exercise via REST helper
     try {
-      await fetchJSON("/rest/v1/exercises", {
-        method: "POST",
-        body: [{ name, primary_muscle, equipment }],
-      });
+const userId = getUserIdOrThrow();
+
+await fetchJSON("/rest/v1/exercises", {
+  method: "POST",
+  body: [{
+    name,
+    primary_muscle: primary_muscle || null,
+    equipment: equipment || null,
+    notes: null,
+    is_system: false,
+    owner_user_id: userId
+  }],
+});
 
       // Clear form, hide and refresh visible list
       nameInput.value = "";
