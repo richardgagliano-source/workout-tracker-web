@@ -470,9 +470,21 @@ tParams.set("limit", "200");
   });
 }
 
-async function createTemplate(userId, name, split_type) {
-const body = [{ name, split_type }];
-  const created = await fetchJSON(`/rest/v1/workout_templates`, { method: "POST", body });
+async function createTemplate(name) {
+  const userId = getUserIdOrThrow(); // ensures not null
+  const body = [
+    {
+      user_id: userId,      // <-- REQUIRED by your table
+      name,
+      split_type: null,     // <-- since you removed push/pull dropdown
+    },
+  ];
+
+  const created = await fetchJSON(`/rest/v1/workout_templates`, {
+    method: "POST",
+    body,
+  });
+
   return created?.[0];
 }
 
