@@ -404,18 +404,8 @@ $("exerciseSearch").addEventListener("input", async () => {
       toggleBtn.textContent = "Add exercise";
       msg.textContent = "";
 
-      // Refresh library results: if there is a search term, re-run it, otherwise reload top list
-      const term = $("exerciseSearch")?.value?.trim() || "";
-      const list = $("exerciseList");
-      if (list) {
-        list.innerHTML = "Loading...";
-        const ex = await loadExercises(term);
-        list.innerHTML = "";
-        (ex || []).slice(0, 80).forEach((e) => {
-      list.appendChild(renderExerciseCard(e));
-    });
-        if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
-      }
+      // Refresh library list (re-run the existing search handler)
+$("exerciseSearch")?.dispatchEvent(new Event("input"));
       // show success toast-like text briefly
       msg.textContent = "Saved!";
       setTimeout(() => (msg.textContent = ""), 1500);
