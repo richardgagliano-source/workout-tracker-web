@@ -23,8 +23,6 @@ let openProgramIds = new Set();
 let programSearchTerms = new Map(); // template_id -> last search term
 let lastProgramFocusId = null;
 let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
-let videoLinkCache = new Map(); // exerciseId -> video_link
-
 
 // --- DOM helpers ---
 const $ = (id) => document.getElementById(id);
@@ -1018,117 +1016,227 @@ async function insertSets(rows) {
   await fetchJSON(`/rest/v1/sets`, { method: "POST", body: rows });
 }
 
-
-function normalizeYouTubeUrl(url) {
-  if (!url) return "";
-  const s = String(url).trim();
-  if (!s) return "";
-  // ensure it has a protocol so <a> works on iOS
-  if (/^https?:\/\//i.test(s)) return s;
-  return "https://" + s.replace(/^\/\//, "");
-}
-
-async function getVideoLinkForExercise(exerciseId) {
-  try {
-    if (!exerciseId) return "";
-    if (videoLinkCache.has(exerciseId)) return videoLinkCache.get(exerciseId) || "";
-
-    const params = new URLSearchParams();
-    params.set("select", "id,video_link");
-    params.set("id", `eq.${exerciseId}`);
-
-    const rows = await fetchJSON(`/rest/v1/exercises?${params.toString()}`);
-    const link = rows?.[0]?.video_link ? normalizeYouTubeUrl(rows[0].video_link) : "";
-    videoLinkCache.set(exerciseId, link);
-    return link;
-  } catch (err) {
-    console.error("getVideoLinkForExercise failed", err);
-    return "";
-  }
-}
-
-
-
 function renderActiveWorkout() {
-  const container = $("activeWorkout");
-  if (!container) return;
-
-  container.innerHTML = "";
+  const host = $("activeWorkout");
+  host.innerHTML = "";
   if (!activeWorkout) {
-    container.innerHTML = '<div class="muted">No active workout. Choose a template and press Start.</div>';
+    host.innerHTML = `<div class="muted">No active workout. Choose a template and press Start.</div>`;
     return;
   }
 
-  (activeWorkout.items || []).forEach((item, idx) => {
-    const wrap = document.createElement("div");
-    wrap.className = "workoutItem";
+  activeWorkout.items.forEach((item, idx) => {
+    const card = document.createElement("div");
+    card.className = "item";
+    const h = document.createElement("h3");
+    h.textContent = `${idx + 1}. ${item.exerciseName}`;
 
-    const left = document.createElement("div");
-    left.className = "workoutItemLeft";
+    const setsBox = document.createElement("div");
+    setsBox.className = "stack";
 
-    const title = document.createElement("h3");
-    title.textContent = `${idx + 1}. ${item.exerciseName}`;
-    left.appendChild(title);
+    function renderSets() {
+      setsBox.innerHTML = "";
+      item.sets.forEach((s, si) => {
+        const row = document.createElement("div");
+        row.className = "row";
 
-    (item.sets || []).forEach((s, setIdx) => {
-      const row = document.createElement("div");
-      row.className = "row";
-      row.innerHTML = `
-        <input class="input" data-kind="weight" placeholder="weight" value="${escapeHtml(s.weight ?? "")}">
-        <input class="input" data-kind="reps" placeholder="reps" value="${escapeHtml(s.reps ?? "")}">
-        <button class="secondary" data-action="removeSet">Remove</button>
-      `;
+        const w = document.createElement("input");
+        w.placeholder = "weight";
+        w.inputMode = "decimal";
+        w.value = s.weight ?? "";
+        w.oninput = () => (s.weight = w.value);
 
-      row.querySelector('[data-action="removeSet"]')?.addEventListener("click", () => {
-        item.sets.splice(setIdx, 1);
-        renderActiveWorkout();
+        const r = document.createElement("input");
+        r.placeholder = "reps";
+        r.inputMode = "numeric";
+        r.value = s.reps ?? "";
+        r.oninput = () => (s.reps = r.value);
+
+        const del = document.createElement("button");
+        del.className = "secondary";
+        del.textContent = "Remove";
+        del.onclick = () => {
+          item.sets = item.sets
+            .filter((_, j) => j !== si)
+            .map((x, j) => ({ ...x, set_index: j }));
+          renderSets();
+        };
+
+        row.append(w, r, del);
+        setsBox.appendChild(row);
       });
+    }
 
-      row.querySelectorAll("input").forEach((inp) => {
-        inp.addEventListener("input", () => {
-          const kind = inp.getAttribute("data-kind");
-          if (kind === "weight") s.weight = inp.value;
-          if (kind === "reps") s.reps = inp.value;
-        });
-      });
-
-      left.appendChild(row);
-    });
-
-    const btnRow = document.createElement("div");
-    btnRow.className = "row";
-    btnRow.innerHTML = `
-      <button class="secondary" data-action="removeExercise">Remove</button>
-      <button class="secondary" data-action="addSet">Add set</button>
-    `;
-
-    btnRow.querySelector('[data-action="removeExercise"]')?.addEventListener("click", () => {
-      activeWorkout.items.splice(idx, 1);
-      renderActiveWorkout();
-    });
-
-    btnRow.querySelector('[data-action="addSet"]')?.addEventListener("click", () => {
+    const addSet = document.createElement("button");
+    addSet.className = "secondary";
+    addSet.textContent = "Add set";
+    addSet.onclick = () => {
       item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
-      renderActiveWorkout();
-    });
+      renderSets();
+    };
 
-    left.appendChild(btnRow);
-
-    const right = document.createElement("div");
-    right.className = "workoutItemRight";
-    right.innerHTML = '<div class="muted">Loading demo…</div>';
-
-    wrap.appendChild(left);
-    wrap.appendChild(right);
-    container.appendChild(wrap);
-
-    // Load & render video (lazy, so it doesn't block the UI)
-    (async () => {
-      const link = await getVideoLinkForExercise(item.exerciseId);
-      if (link) right.innerHTML = renderVideoThumb(link);
-      else right.innerHTML = '<div class="muted">No demo video</div>';
-    })();
+    renderSets();
+    card.append(h, setsBox, addSet);
+    host.appendChild(card);
   });
+}
+
+// Start workout (autofill last sets if available)
+$("startWorkoutBtn").addEventListener("click", async () => {
+  setWorkoutMsg("");
+
+  const templateId = $("startTplSelect").value;
+  if (!templateId) return alert("Pick a template first.");
+
+  const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
+  if (!tpl) return alert("Template not found. Go to Templates tab and refresh.");
+  if (!tpl.items || tpl.items.length === 0) return alert("This template has no exercises yet.");
+
+  try {
+    const userId = getUserIdOrThrow();
+
+    // AUTOFILL attempt (non-blocking)
+    const exerciseIds = tpl.items.map((it) => it.exercise_id).filter(Boolean);
+    let lastSetsMap = new Map();
+    try {
+      lastSetsMap = await loadLastSetsByExercise(userId, exerciseIds);
+    } catch (e) {
+      console.warn("Autofill failed (non-blocking):", e);
+      lastSetsMap = new Map();
+    }
+
+    const workout = await createWorkout(userId);
+    if (!workout?.id) throw new Error("Failed to create workout.");
+
+    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
+    const nameByExerciseId = new Map(tpl.items.map((it) => [it.exercise_id, it.exercise_name]));
+
+    activeWorkout = {
+      workoutId: workout.id,
+      items: (weInserted || [])
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((we) => {
+          const prevSets = lastSetsMap.get(we.exercise_id);
+          return {
+            workoutExerciseId: we.id,
+            exerciseId: we.exercise_id,
+            exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+            sets: (prevSets && prevSets.length)
+              ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
+              : [{ set_index: 0, weight: "", reps: "" }],
+          };
+        }),
+    };
+
+    renderActiveWorkout();
+    show($("saveWorkoutBtn"));
+    setWorkoutMsg("Workout started. Autofilled last weights/reps (if available).");
+  } catch (err) {
+    console.error(err);
+    alert(String(err.message || err));
+  }
+});
+
+// --------------------
+// Progress + PR detection (NEW)
+// --------------------
+
+// Pull recent workout ids for user (so we can avoid fragile nested PostgREST filters)
+async function loadRecentWorkoutIds(userId, limit = 2000) {
+  const p = new URLSearchParams();
+  p.set("select", "id,performed_at");
+  p.set("user_id", `eq.${userId}`);
+  p.set("order", "performed_at.desc");
+  p.set("limit", String(limit));
+  return (await fetchJSON(`/rest/v1/workouts?${p.toString()}`)) || [];
+}
+
+// Pull all sets for ONE exercise across recent workouts (chunked)
+async function loadExerciseHistory(userId, exerciseId, { workoutLimit = 2000 } = {}) {
+  const workouts = await loadRecentWorkoutIds(userId, workoutLimit);
+  if (!workouts.length) return [];
+
+  const workoutIds = workouts.map(w => w.id);
+  const workoutDateById = new Map(workouts.map(w => [w.id, w.performed_at]));
+
+  // 1) workout_exercises for those workouts, filtered to exerciseId
+  const weRows = [];
+  for (const idsChunk of chunk(workoutIds, 150)) {
+    const p = new URLSearchParams();
+    p.set("select", "id,workout_id,exercise_id,order_index");
+    p.set("workout_id", `in.(${idsChunk.join(",")})`);
+    p.set("exercise_id", `eq.${exerciseId}`);
+    p.set("limit", "10000");
+    const rows = (await fetchJSON(`/rest/v1/workout_exercises?${p.toString()}`)) || [];
+    weRows.push(...rows);
+  }
+
+  if (!weRows.length) return [];
+
+  const weIds = weRows.map(r => r.id);
+
+  // 2) sets for those workout_exercise ids
+  const setRows = [];
+  for (const idsChunk of chunk(weIds, 150)) {
+    const p = new URLSearchParams();
+    p.set("select", "workout_exercise_id,set_index,weight,reps");
+    p.set("workout_exercise_id", `in.(${idsChunk.join(",")})`);
+    p.set("order", "workout_exercise_id.asc,set_index.asc");
+    p.set("limit", "20000");
+    const rows = (await fetchJSON(`/rest/v1/sets?${p.toString()}`)) || [];
+    setRows.push(...rows);
+  }
+
+  // stitch into sessions by workout_id
+  const weById = new Map(weRows.map(r => [r.id, r]));
+  const setsByWorkout = new Map(); // workout_id -> sets[]
+  for (const s of setRows) {
+    const we = weById.get(s.workout_exercise_id);
+    if (!we) continue;
+    const wid = we.workout_id;
+    const arr = setsByWorkout.get(wid) || [];
+    arr.push({
+      workout_id: wid,
+      performed_at: workoutDateById.get(wid) || null,
+      weight: s.weight,
+      reps: s.reps,
+      set_index: s.set_index ?? 0,
+    });
+    setsByWorkout.set(wid, arr);
+  }
+
+  // finalize: one row per workout for this exercise
+  const out = [];
+  for (const [wid, sets] of setsByWorkout.entries()) {
+    const cleanSets = sets
+      .slice()
+      .sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0))
+      .map(s => ({
+        set_index: s.set_index ?? 0,
+        weight: s.weight,
+        reps: s.reps,
+      }));
+
+    const top = bestSet(cleanSets) || null;
+    const volume = cleanSets.reduce((sum, s) => {
+      const w = Number(s.weight);
+      const r = Number(s.reps);
+      if (!Number.isFinite(w) || !Number.isFinite(r)) return sum;
+      return sum + (w * r);
+    }, 0);
+
+    out.push({
+      workout_id: wid,
+      performed_at: workouts.find(x => x.id === wid)?.performed_at || null,
+      sets: cleanSets,
+      best_weight: top?.weight ?? null,
+      best_reps: top?.reps ?? null,
+      best_e1rm: top?.e1rm ?? null,
+      volume,
+    });
+  }
+
+  out.sort((a, b) => new Date(b.performed_at) - new Date(a.performed_at));
+  return out;
 }
 
 function computePRsFromHistory(historyRows) {
