@@ -277,3 +277,9 @@ main {
     margin-right: auto;
   }
 }
+@media (max-width: 768px) {
+  main {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
