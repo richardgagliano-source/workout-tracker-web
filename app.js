@@ -470,23 +470,21 @@ tParams.set("limit", "200");
   });
 }
 
-async function createTemplate(name) {
-  const userId = getUserIdOrThrow(); // ensures not null
-  const body = [
-    {
-      user_id: userId,      // <-- REQUIRED by your table
-      name,
-      split_type: null,     // <-- since you removed push/pull dropdown
-    },
-  ];
+async function createTemplate(userId, name, split_type) {
+  const body = [{
+    user_id: userId,      // <-- REQUIRED by your DB
+    name,
+    split_type
+  }];
 
   const created = await fetchJSON(`/rest/v1/workout_templates`, {
     method: "POST",
-    body,
+    body
   });
 
   return created?.[0];
 }
+
 
 function refreshStartWorkoutDropdown() {
   const sel = $("startTplSelect");
