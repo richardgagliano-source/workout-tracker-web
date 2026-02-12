@@ -5,14 +5,17 @@
 :root {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
 
-  /* Dark theme tokens */
-  --bg: #0b0f17;
-  --surface: #121a26;
-  --surface-2: #0f1622;
-  --border: rgba(255, 255, 255, 0.10);
-  --text: rgba(255, 255, 255, 0.92);
+  /* Deep blue theme */
+  --bg: #0a1a2f;
+  --surface: #112743;
+  --surface-2: #162f52;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --text: rgba(255, 255, 255, 0.95);
   --muted: rgba(255, 255, 255, 0.65);
-  --accent: #7dd3fc; /* light blue */
+
+  /* Orange accent */
+  --accent: #ff8c32;
 }
 
 html, body {
@@ -22,7 +25,6 @@ html, body {
   color: var(--text);
 }
 
-/* THIS is what your JS toggles */
 .hidden { display: none !important; }
 
 h1 { margin: 0; font-size: 20px; }
@@ -62,7 +64,7 @@ input, select, textarea {
   font-size: 16px;
   box-sizing: border-box;
   width: 100%;
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.05);
   color: var(--text);
   border: 1px solid var(--border);
 }
@@ -73,21 +75,34 @@ input::placeholder, textarea::placeholder {
   color: rgba(255,255,255,0.45);
 }
 
+/* Orange focus highlight */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255,140,50,0.25);
+}
+
 /* Buttons */
 button {
   padding: 10px 12px;
   border-radius: 10px;
   font-size: 14px;
   cursor: pointer;
-  background: rgba(255,255,255,0.10);
-  color: var(--text);
-  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #111;
+  border: none;
 }
 
-button:hover { background: rgba(255,255,255,0.14); }
+button:hover {
+  background: #ffa14f;
+}
 
 button.secondary {
   background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
 }
 
 button:disabled {
@@ -114,24 +129,23 @@ button:disabled {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(125, 211, 252, 0.12);
+  background: rgba(255,140,50,0.15);
   color: var(--accent);
-  border: 1px solid rgba(125, 211, 252, 0.25);
+  border: 1px solid rgba(255,140,50,0.4);
   font-size: 12px;
   margin-left: 6px;
 }
 
 /* ==========================================================
-   OPTION B: HEADER FIXED, WHOLE MAIN SCROLLS
+   HEADER + LAYOUT (UNCHANGED STRUCTURE)
    ========================================================== */
 
 body {
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* body doesn't scroll */
+  overflow: hidden;
 }
 
-/* Top header stays fixed */
 header.topbar {
   flex: 0 0 auto;
   padding: 16px 24px;
@@ -139,7 +153,6 @@ header.topbar {
   background: transparent;
 }
 
-/* Everything below header scrolls */
 main {
   flex: 1 1 auto;
   overflow: auto;
@@ -148,10 +161,6 @@ main {
   margin: 0 auto;
   width: 100%;
 }
-
-/* ==========================================================
-   HEADER CONTENT (TITLE + SUBTITLE + HAMBURGER)
-   ========================================================== */
 
 .topbar {
   display: flex;
@@ -170,27 +179,14 @@ main {
 }
 
 /* ==========================================================
-   TABS ROW (HIDDEN — app.js still uses it)
+   HAMBURGER MENU (STRUCTURE UNCHANGED)
    ========================================================== */
 
-.tabs-hidden {
-  display: none !important;
-}
-.tabs.tabs-hidden {
-  display: none !important;
-}
-
-/* ==========================================================
-   HAMBURGER MENU (FIXED TO YOUR HTML)
-   ========================================================== */
-
-/* wrapper around button + dropdown */
 .menu-wrap {
   position: relative;
   z-index: 9999;
 }
 
-/* hamburger button */
 .icon-btn {
   min-width: 56px;
   height: 44px;
@@ -198,12 +194,11 @@ main {
   font-size: 20px;
   line-height: 1;
   border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 
-/* dropdown panel
-   IMPORTANT: NO #hamburgerMenu { display: flex !important; } anywhere.
-   We let your JS control visibility via .hidden
-*/
 #hamburgerMenu.menu {
   position: absolute;
   right: 0;
@@ -212,49 +207,45 @@ main {
   padding: 14px;
   border-radius: 12px;
 
-  background: rgba(18, 26, 38, 0.98);
+  background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: 0 16px 40px rgba(0,0,0,.45);
 
-  display: flex;              /* vertical menu */
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
+
+  box-shadow: 0 16px 40px rgba(0,0,0,.45);
 }
 
-/* menu items */
 .menu-item {
   width: 100%;
   text-align: left;
   padding: 10px 12px;
   border-radius: 10px;
   background: transparent;
-  border: 1px solid transparent;
-  display: block;
+  color: var(--text);
+  border: none;
 }
 
 .menu-item:hover {
-  border-color: rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,140,50,0.15);
+  color: var(--accent);
 }
 
-/* divider */
 .menu-divider {
   height: 1px;
   background: rgba(255,255,255,0.10);
   margin: 6px 0;
 }
 
-/* signed in area */
 .menu-user {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* make sign out look consistent */
 .menu-user button {
   width: 100%;
   text-align: left;
 }
-#hamburgerBtn { pointer-events: auto; }
