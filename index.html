@@ -1,115 +1,113 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Richard and Kevin's Workout Tracker</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Richard and Kevin's Workout Tracker</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
 
-  <body>
-<header class="topbar">
-  <div class="title-block">
-    <h1>Richard and Kevin's Workout Tracker</h1>
-    <div class="subtitle">for our healthy life</div>
-  </div>
+  <body>
+    <header class="topbar">
+      <div class="title-block">
+        <h1>Richard and Kevin's Workout Tracker</h1>
+        <div class="subtitle">for our healthy life</div>
+      </div>
 
-  <div id="userBar"></div>
-</header>
+      <div id="userBar"></div>
+    </header>
 
+    <main>
+      <!-- AUTH -->
+      <section id="authSection" class="card">
+        <h2>Sign in</h2>
+        <div class="grid">
+          <input id="email" type="email" placeholder="Email" autocomplete="email" />
+          <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+        </div>
+        <div class="row">
+          <button id="signInBtn">Sign in</button>
+          <button id="signUpBtn" class="secondary">Sign up</button>
+        </div>
+        <p class="muted" id="authMsg"></p>
+      </section>
 
-    <main>
-      <!-- AUTH -->
-      <section id="authSection" class="card">
-        <h2>Sign in</h2>
-        <div class="grid">
-          <input id="email" type="email" placeholder="Email" autocomplete="email" />
-          <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
-        </div>
-        <div class="row">
-          <button id="signInBtn">Sign in</button>
-          <button id="signUpBtn" class="secondary">Sign up</button>
-        </div>
-        <p class="muted" id="authMsg"></p>
-      </section>
+      <!-- APP -->
+      <section id="appSection" class="card hidden">
+        <div class="tabs">
+          <!-- ORDER + LABELS UPDATED -->
+          <button class="tab active" data-tab="workout">Start a Workout</button>
+          <button class="tab" data-tab="templates">Create a Workout</button>
+          <button class="tab" data-tab="library">Exercise Library</button>
+          <button class="tab" data-tab="history">Workout History</button>
+          <button class="tab" data-tab="progress">Exercise Progress</button>
+        </div>
 
-      <!-- APP -->
-      <section id="appSection" class="card hidden">
-        <div class="tabs">
-          <button class="tab active" data-tab="templates">Programs</button>
-          <button class="tab" data-tab="workout">Workout</button>
-          <button class="tab" data-tab="library">Library</button>
-          <button class="tab" data-tab="history">History</button>
-          <button class="tab" data-tab="progress">Progress</button>
-        </div>
+        <!-- Workout (DEFAULT VISIBLE) -->
+        <div class="panel" id="tab-workout">
+          <h2>Start a Workout</h2>
+          <div class="row">
+            <select id="startTplSelect"></select>
+            <button id="startWorkoutBtn">Start</button>
+          </div>
 
-        <!-- Templates -->
-        <div class="panel" id="tab-templates">
-          <h2>Programs</h2>
+          <div id="activeWorkout" class="stack"></div>
+          <button id="saveWorkoutBtn" class="hidden">Save workout</button>
+          <p class="muted" id="workoutMsg"></p>
+        </div>
 
-<div class="row">
-<input id="tplName" placeholder="Program name (e.g., Push A)" />
-  <button id="createTplBtn">Create</button>
-</div>
+        <!-- Templates (Create a Workout) -->
+        <div class="panel hidden" id="tab-templates">
+          <h2>Create a Workout</h2>
 
+          <div class="row">
+            <input id="tplName" placeholder="Program name (e.g., Push A)" />
+            <button id="createTplBtn">Create</button>
+          </div>
 
-          <div id="templatesList" class="stack"></div>
-        </div>
+          <div id="templatesList" class="stack"></div>
+        </div>
 
-        <!-- Workout -->
-        <div class="panel hidden" id="tab-workout">
-          <h2>Start workout</h2>
-          <div class="row">
-            <select id="startTplSelect"></select>
-            <button id="startWorkoutBtn">Start</button>
-          </div>
+        <!-- Library -->
+        <div class="panel hidden" id="tab-library">
+          <h2>Exercise Library</h2>
+          <input id="exerciseSearch" placeholder="Search exercises..." />
+          <div id="exerciseList" class="stack"></div>
+        </div>
 
-          <div id="activeWorkout" class="stack"></div>
-          <button id="saveWorkoutBtn" class="hidden">Save workout</button>
-          <p class="muted" id="workoutMsg"></p>
-        </div>
+        <!-- History -->
+        <div class="panel hidden" id="tab-history">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <h2 style="margin:0;">Workout History</h2>
 
-        <!-- Library -->
-        <div class="panel hidden" id="tab-library">
-          <h2>Exercise library</h2>
-          <input id="exerciseSearch" placeholder="Search exercises..." />
-          <div id="exerciseList" class="stack"></div>
-        </div>
+            <select id="historyFilter">
+              <option value="20" selected>Last 20</option>
+              <option value="50">Last 50</option>
+              <option value="200">Last 200</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All</option>
+            </select>
+          </div>
 
-<!-- History -->
-<div class="panel hidden" id="tab-history">
-  <div class="row" style="justify-content: space-between; align-items: center;">
-    <h2 style="margin:0;">History</h2>
+          <div id="historyDetail" class="stack hidden"></div>
+          <div id="historyList" class="stack"></div>
+        </div>
 
-    <select id="historyFilter">
-      <option value="20" selected>Last 20</option>
-      <option value="50">Last 50</option>
-      <option value="200">Last 200</option>
-      <option value="7d">Last 7 days</option>
-      <option value="30d">Last 30 days</option>
-      <option value="all">All</option>
-    </select>
-  </div>
+        <!-- Progress -->
+        <div class="panel hidden" id="tab-progress">
+          <h2>Exercise Progress</h2>
 
-  <div id="historyDetail" class="stack hidden"></div>
-  <div id="historyList" class="stack"></div>
-</div>
+          <div class="row">
+            <input id="progressSearch" placeholder="Search exercise (e.g., Bench Press)..." />
+          </div>
 
-        <!-- Progress -->
-        <div class="panel hidden" id="tab-progress">
-          <h2>Progress & PRs</h2>
+          <div id="progressSearchResults" class="stack"></div>
+          <div id="progressView" class="stack"></div>
+        </div>
+      </section>
+    </main>
 
-          <div class="row">
-            <input id="progressSearch" placeholder="Search exercise (e.g., Bench Press)..." />
-          </div>
-
-          <div id="progressSearchResults" class="stack"></div>
-
-          <div id="progressView" class="stack"></div>
-        </div>
-      </section>
-    </main>
-
-    <script type="module" src="./app.js"></script>
-  </body>
+    <script type="module" src="./app.js"></script>
+  </body>
 </html>
