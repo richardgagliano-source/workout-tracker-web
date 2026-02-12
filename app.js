@@ -188,21 +188,41 @@ $("exerciseSearch").addEventListener("input", async () => {
   const term = $("exerciseSearch").value.trim();
   const list = $("exerciseList");
   list.innerHTML = "Loading...";
+
   try {
     const ex = await loadExercises(term);
     list.innerHTML = "";
+
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
       card.className = "item";
-card.innerHTML = `<h3>${e.name}</h3>`;
+      card.style.cursor = "pointer";
+
+      // Only show the name (primary muscle hidden)
+      card.innerHTML = `<h3>${e.name}</h3>`;
+
+      // Click behavior: open video if available
+      card.addEventListener("click", () => {
+        if (e.video_link && e.video_link.trim() !== "") {
+          window.open(e.video_link, "_blank", "noopener,noreferrer");
+        } else {
+          alert("No video link saved for this exercise yet.");
+        }
+      });
+
       list.appendChild(card);
     });
-    if (!ex || ex.length === 0) list.innerHTML = `<div class="muted">No exercises found.</div>`;
+
+    if (!ex || ex.length === 0) {
+      list.innerHTML = `<div class="muted">No exercises found.</div>`;
+    }
+
   } catch (err) {
     console.error(err);
     list.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
 });
+);
 // ---- Library: Add Exercise UI (insert after exerciseSearch handler) ----
 (function setupAddExerciseUI() {
   const libTab = $("tab-library"); // library tab container
