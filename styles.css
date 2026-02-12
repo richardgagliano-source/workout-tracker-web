@@ -519,3 +519,35 @@ main {
   background: rgba(255,255,255,0.10);
   margin: 10px 0;
 }
+/* --------------------------------------------------------------------------
+   Menu panel (hamburger) — vertical layout
+   -------------------------------------------------------------------------- */
+
+.menu-panel {
+  display: none;
+}
+
+.menu.open .menu-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.menu-panel > button,
+.menu-panel > a,
+.menu-panel > .menu-item {
+  width: 100%;
+  text-align: left;
+}
+
+.menu-panel .menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.10);
+  margin: 8px 0;
+}
+
+.menu-panel .menu-user {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
