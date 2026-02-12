@@ -134,3 +134,30 @@ header, #userBar, .topbar {
   background: transparent !important;
   color: rgba(255,255,255,0.92) !important;
 }
+/* ---------- Top Header Layout ---------- */
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.title-block h1 {
+  margin: 0;
+}
+
+.subtitle {
+  font-style: italic;
+  font-size: 0.95rem;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+/* Make user section align nicely on right */
+#userBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
