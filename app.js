@@ -345,15 +345,27 @@ $("exerciseSearch").addEventListener("input", async () => {
     (ex || []).slice(0, 80).forEach((e) => {
       const card = document.createElement("div");
       card.className = "item";
-     card.innerHTML = `
-  <h3>${e.name}</h3>
+ // use the video_link field from Supabase
+const videoUrl = e.video_link || "";
+const youtubeThumb = youtubeThumbnailHtml(videoUrl, e.name);
+
+let videoHtml = "";
+if (videoUrl) {
+  if (youtubeThumb) {
+    videoHtml = `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener noreferrer" class="video-thumb-container">${youtubeThumb}</a>`;
+  } else {
+    videoHtml = `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(videoUrl)}</a>`;
+  }
+}
+
+card.innerHTML = `
+  <h3>${escapeHtml(e.name)}</h3>
   <div class="small">
-    <a href="${e.video_url}" target="_blank" rel="noopener noreferrer">
-      ${e.video_url}
-    </a>
-    ${e.equipment ? " - " + e.equipment : ""}
+    ${videoHtml}
+    ${e.equipment ? `<span> - ${escapeHtml(e.equipment)}</span>` : ""}
   </div>
 `;
+
 
       list.appendChild(card);
     });
