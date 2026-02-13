@@ -30,6 +30,107 @@ const show = (el) => el.classList.remove("hidden");
 const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
+// -----------------------------
+// Save-workout GIF modal (no HTML changes needed)
+// -----------------------------
+function ensureSaveGifModal() {
+  if (document.getElementById("saveGifOverlay")) return;
+
+  // Styles (scoped)
+  const style = document.createElement("style");
+  style.id = "saveGifModalStyles";
+  style.textContent = `
+    #saveGifOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0,0,0,0.45);
+      z-index: 9999;
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+    }
+    #saveGifOverlay.show { display: flex; }
+
+    #saveGifModal {
+      width: min(420px, 92vw);
+      border-radius: 18px;
+      padding: 14px;
+      background: rgba(12, 20, 30, 0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    #saveGifModal img {
+      width: 100%;
+      height: auto;
+      border-radius: 14px;
+      display: block;
+    }
+    #saveGifHint {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 13px;
+      opacity: 0.75;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Overlay + modal
+  const overlay = document.createElement("div");
+  overlay.id = "saveGifOverlay";
+
+  const modal = document.createElement("div");
+  modal.id = "saveGifModal";
+
+  const img = document.createElement("img");
+  img.alt = "Saved!";
+  // Put giphy.gif in the same folder as index.html (GitHub Pages root for your app)
+  img.src = "giphy.gif";
+  img.loading = "eager";
+  img.decoding = "async";
+
+  const hint = document.createElement("div");
+  hint.id = "saveGifHint";
+  hint.textContent = "Saved ✅  (tap to close)";
+
+  modal.append(img, hint);
+  overlay.appendChild(modal);
+
+  // Close interactions
+  overlay.addEventListener("click", () => hideSaveGifModal());
+  modal.addEventListener("click", (e) => e.stopPropagation()); // don't close when tapping the gif
+
+  // If gif can't load, don't break anything—just hide.
+  img.addEventListener("error", () => hideSaveGifModal());
+
+  document.body.appendChild(overlay);
+}
+
+let _saveGifTimer = null;
+
+function showSaveGifModal(ms = 1500) {
+  ensureSaveGifModal();
+  const overlay = document.getElementById("saveGifOverlay");
+  if (!overlay) return;
+  overlay.classList.add("show");
+
+  if (_saveGifTimer) clearTimeout(_saveGifTimer);
+  _saveGifTimer = setTimeout(() => hideSaveGifModal(), ms);
+}
+
+function hideSaveGifModal() {
+  const overlay = document.getElementById("saveGifOverlay");
+  if (overlay) overlay.classList.remove("show");
+  if (_saveGifTimer) {
+    clearTimeout(_saveGifTimer);
+    _saveGifTimer = null;
+  }
+}
+
 // --------------------
 // Hamburger menu: open/close + tab navigation
 // --------------------
