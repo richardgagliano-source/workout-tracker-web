@@ -477,9 +477,3 @@ a:hover {
   width:72px;
   margin-top:10px;
 }
-.item {
-  background: rgba(12, 25, 45, 0.20);   /* more transparent */
-  backdrop-filter: blur(18px);          /* stronger blur */
-  -webkit-backdrop-filter: blur(18px);
-  border-color: rgba(255,255,255,0.08);
-}
