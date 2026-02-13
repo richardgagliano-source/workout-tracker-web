@@ -105,56 +105,65 @@ button:disabled {
 
 /* Cards/items */
 .card, .item, .panel {
-  background: var(--surface);
+  position: relative; /* REQUIRED for premium glass ::before */
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  overflow: hidden; /* keep highlight inside rounded corners */
 }
 
-.item {
-  background: var(--surface-2);
-  padding: 12px;
-}
-/* ===== LAYER 1 – OUTER CARD (most transparent) ===== */
-.card:first-of-type {
-  background: rgba(12, 25, 45, 0.35);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
-}
-
-/* ===== LAYER 2 – INNER CARD (medium transparency) ===== */
-.card .card {
-  background: rgba(12, 25, 45, 0.50);
+/* ===== OUTER CARDS (main layers) ===== */
+.card, .panel {
+  background: rgba(12, 25, 45, 0.42);              /* transparent */
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 10px 35px rgba(0,0,0,0.50);
+  border-color: rgba(255,255,255,0.08);
 }
 
-/* ===== LAYER 3 – EXERCISE CARDS (closest / strongest glass) ===== */
+/* ===== INNER RECORD CARDS (library rows, history rows, etc.) ===== */
 .item {
-  background: rgba(12, 25, 45, 0.65);
+  background: rgba(12, 25, 45, 0.28);              /* more transparent to show layering */
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+  border-color: rgba(255,255,255,0.06);
+  padding: 12px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.35);
 }
-.card::before,
+
+/* ===== Premium glass highlight (subtle sheen) ===== */
+.card::before, .panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.10) 0%,
+    rgba(255,255,255,0.03) 38%,
+    rgba(255,255,255,0.00) 62%
+  );
+  pointer-events: none;
+}
+
 .item::before {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
     135deg,
-    rgba(255,255,255,0.05) 0%,
-    rgba(255,255,255,0.02) 40%,
-    rgba(255,255,255,0.00) 60%
+    rgba(255,255,255,0.07) 0%,
+    rgba(255,255,255,0.02) 45%,
+    rgba(255,255,255,0.00) 70%
   );
   pointer-events: none;
 }
+
+/* Keep card contents clickable above the highlight overlay */
+.card > *, .panel > *, .item > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* Pills */
 .pill {
   display: inline-block;
