@@ -483,3 +483,43 @@ a:hover {
   -webkit-backdrop-filter: blur(18px);
   border-color: rgba(255,255,255,0.08);
 }
+/* ===================================
+   SAVE WORKOUT GIF MODAL
+   =================================== */
+
+.gif-modal.hidden {
+  display: none;
+}
+
+.gif-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.gif-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.gif-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(320px, 85vw);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(12, 25, 45, 0.55);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+
+.gif-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
