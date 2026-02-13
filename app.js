@@ -1098,66 +1098,90 @@ card.append(h, bodyWrap);
 
 // Start workout (autofill last sets if available)
 $("startWorkoutBtn").addEventListener("click", async () => {
-  setWorkoutMsg("");
 
-  const templateId = $("startTplSelect").value;
-  if (!templateId) return alert("Pick a template first.");
+  const btn = $("startWorkoutBtn");
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Loading...";
 
-  const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
-  if (!tpl) return alert("Template not found. Go to Templates tab and refresh.");
-  if (!tpl.items || tpl.items.length === 0) return alert("This template has no exercises yet.");
+  try {
 
-  try {
-    const userId = getUserIdOrThrow();
+    setWorkoutMsg("");
 
-    // AUTOFILL attempt (non-blocking)
-    const exerciseIds = tpl.items.map((it) => it.exercise_id).filter(Boolean);
-    let lastSetsMap = new Map();
-    try {
-      lastSetsMap = await loadLastSetsByExercise(userId, exerciseIds);
-    } catch (e) {
-      console.warn("Autofill failed (non-blocking):", e);
-      lastSetsMap = new Map();
-    }
+    const templateId = $("startTplSelect").value;
+    if (!templateId) throw new Error("Pick a template first.");
 
-    const workout = await createWorkout(userId);
-    if (!workout?.id) throw new Error("Failed to create workout.");
+    const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
+    if (!tpl) throw new Error("Template not found. Go to Templates tab and refresh.");
+    if (!tpl.items || tpl.items.length === 0)
+      throw new Error("This template has no exercises yet.");
 
-    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
-    const nameByExerciseId = new Map(tpl.items.map((it) => [it.exercise_id, it.exercise_name]));
+    const userId = getUserIdOrThrow();
 
-// Fetch video links for these exercises
-const exIds = tpl.items.map(it => it.exercise_id).join(",");
-const videoRows = await fetchJSON(`/rest/v1/exercises?id=in.(${exIds})&select=id,video_link`);
-const videoMap = new Map((videoRows || []).map(v => [v.id, v.video_link]));
+    // AUTOFILL attempt (non-blocking)
+    const exerciseIds = tpl.items.map((it) => it.exercise_id).filter(Boolean);
+    let lastSetsMap = new Map();
+    try {
+      lastSetsMap = await loadLastSetsByExercise(userId, exerciseIds);
+    } catch (e) {
+      console.warn("Autofill failed (non-blocking):", e);
+      lastSetsMap = new Map();
+    }
 
-activeWorkout = {
-  workoutId: workout.id,
-  items: (weInserted || [])
-    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    .map((we) => {
-      const prevSets = lastSetsMap.get(we.exercise_id);
-      return {
-        workoutExerciseId: we.id,
-        exerciseId: we.exercise_id,
-        exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
-        video_link: videoMap.get(we.exercise_id) || "",
-        sets: (prevSets && prevSets.length)
-          ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
-          : [{ set_index: 0, weight: "", reps: "" }],
-      };
-    }),
-};
+    const workout = await createWorkout(userId);
+    if (!workout?.id) throw new Error("Failed to create workout.");
 
-    renderActiveWorkout();
-    show($("saveWorkoutBtn"));
-    setWorkoutMsg("Workout started. Autofilled last weights/reps (if available).");
-  } catch (err) {
-    console.error(err);
-    alert(String(err.message || err));
-  }
+    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
+    const nameByExerciseId = new Map(
+      tpl.items.map((it) => [it.exercise_id, it.exercise_name])
+    );
+
+    // Fetch video links
+    const exIds = tpl.items.map(it => it.exercise_id).join(",");
+    const videoRows = await fetchJSON(
+      `/rest/v1/exercises?id=in.(${exIds})&select=id,video_link`
+    );
+    const videoMap = new Map(
+      (videoRows || []).map(v => [v.id, v.video_link])
+    );
+
+    activeWorkout = {
+      workoutId: workout.id,
+      items: (weInserted || [])
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((we) => {
+          const prevSets = lastSetsMap.get(we.exercise_id);
+          return {
+            workoutExerciseId: we.id,
+            exerciseId: we.exercise_id,
+            exerciseName:
+              nameByExerciseId.get(we.exercise_id) || "Exercise",
+            video_link: videoMap.get(we.exercise_id) || "",
+            sets:
+              prevSets && prevSets.length
+                ? prevSets.map((s, i) => ({
+                    set_index: i,
+                    weight: s.weight ?? "",
+                    reps: s.reps ?? "",
+                  }))
+                : [{ set_index: 0, weight: "", reps: "" }],
+          };
+        }),
+    };
+
+    renderActiveWorkout();
+    show($("saveWorkoutBtn"));
+    setWorkoutMsg("Workout started. Autofilled last weights/reps (if available).");
+
+  } catch (err) {
+    console.error(err);
+    alert(String(err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+
 });
-
 // --------------------
 // Progress + PR detection (NEW)
 // --------------------
