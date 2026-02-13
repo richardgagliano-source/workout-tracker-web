@@ -116,7 +116,32 @@ button:disabled {
   background: var(--surface-2);
   padding: 12px;
 }
+/* ===== LAYER 1 – OUTER CARD (most transparent) ===== */
+.card:first-of-type {
+  background: rgba(12, 25, 45, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
 
+/* ===== LAYER 2 – INNER CARD (medium transparency) ===== */
+.card .card {
+  background: rgba(12, 25, 45, 0.50);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 35px rgba(0,0,0,0.50);
+}
+
+/* ===== LAYER 3 – EXERCISE CARDS (closest / strongest glass) ===== */
+.item {
+  background: rgba(12, 25, 45, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+}
 /* Pills */
 .pill {
   display: inline-block;
