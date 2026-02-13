@@ -1083,11 +1083,7 @@ const leftCol = document.createElement("div");
 leftCol.className = "workout-left";
 leftCol.append(setsBox, addSet);
 
-const rightCol = document.createElement("div");
-rightCol.className = "workout-right";
-rightCol.innerHTML = renderVideoThumb(item.video_link);
-
-bodyWrap.append(leftCol, rightCol);
+bodyWrap.append(leftCol);
 
 card.append(h, bodyWrap);
     host.appendChild(card);
