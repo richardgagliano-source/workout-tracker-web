@@ -523,3 +523,7 @@ a:hover {
   height: auto;
   display: block;
 }
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
