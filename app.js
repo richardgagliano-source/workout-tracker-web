@@ -1069,7 +1069,7 @@ function renderActiveWorkout() {
 }
 
     const addSet = document.createElement("button");
-    addSet.className = "secondary";
+addSet.className = "secondary mini-control add-set-btn";
     addSet.textContent = "Add set";
     addSet.onclick = () => {
       item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
