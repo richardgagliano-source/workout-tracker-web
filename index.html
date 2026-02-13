@@ -1,129 +1,131 @@
+
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Workout Tracker</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workout Tracker</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
 
-  <body>
-    <header class="topbar">
-      <div class="title-block">
-        <h1>Workout Tracker</h1>
-        <div class="subtitle">for your healthy life</div>
-      </div>
+  <body>
+    <header class="topbar">
+      <div class="title-block">
+        <h1>Workout Tracker</h1>
+        <div class="subtitle">for your healthy life</div>
+      </div>
 
-      <!-- Hamburger -->
-      <div class="menu-wrap">
-        <button id="hamburgerBtn" class="icon-btn" aria-label="Menu">☰</button>
+      <!-- Hamburger -->
+      <div class="menu-wrap">
+        <button id="hamburgerBtn" class="icon-btn" aria-label="Menu">☰</button>
 
-        <div id="hamburgerMenu" class="menu hidden">
-          <button class="menu-item" data-tab="workout">Start a workout</button>
-          <button class="menu-item" data-tab="templates">Create</button>
-          <button class="menu-item" data-tab="library">Library</button>
-          <button class="menu-item" data-tab="history">History</button>
-          <button class="menu-item" data-tab="progress">Progress</button>
+        <div id="hamburgerMenu" class="menu hidden">
+          <button class="menu-item" data-tab="workout">Start a workout</button>
+          <button class="menu-item" data-tab="templates">Create</button>
+          <button class="menu-item" data-tab="library">Library</button>
+          <button class="menu-item" data-tab="history">History</button>
+          <button class="menu-item" data-tab="progress">Progress</button>
 
-          <div class="menu-divider"></div>
+          <div class="menu-divider"></div>
 
-          <!-- Signed in as / Sign out will render here -->
-          <div id="userBar" class="menu-user"></div>
-        </div>
-      </div>
-    </header>
+          <!-- Signed in as / Sign out will render here -->
+          <div id="userBar" class="menu-user"></div>
+        </div>
+      </div>
+    </header>
 
-    <main>
-      <!-- AUTH -->
-      <section id="authSection" class="card">
-        <h2>Sign in</h2>
-        <div class="grid">
-          <input id="email" type="email" placeholder="Email" autocomplete="email" />
-          <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
-        </div>
-        <div class="row">
-          <button id="signInBtn">Sign in</button>
-          <button id="signUpBtn" class="secondary">Sign up</button>
-        </div>
-        <p class="muted" id="authMsg"></p>
-      </section>
+    <main>
+      <!-- AUTH -->
+      <section id="authSection" class="card">
+        <h2>Sign in</h2>
+        <div class="grid">
+          <input id="email" type="email" placeholder="Email" autocomplete="email" />
+          <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+        </div>
+        <div class="row">
+          <button id="signInBtn">Sign in</button>
+          <button id="signUpBtn" class="secondary">Sign up</button>
+        </div>
+        <p class="muted" id="authMsg"></p>
+      </section>
 
-      <!-- APP -->
-      <section id="appSection" class="card hidden">
-        <!-- KEEP these tabs (hidden) so your existing app.js tab logic still works -->
-        <div class="tabs tabs-hidden">
-          <button class="tab" data-tab="workout">Workout</button>
-          <button class="tab" data-tab="templates">Programs</button>
-          <button class="tab" data-tab="library">Library</button>
-          <button class="tab" data-tab="history">History</button>
-          <button class="tab" data-tab="progress">Progress</button>
-        </div>
+      <!-- APP -->
+      <section id="appSection" class="card hidden">
+        <!-- KEEP these tabs (hidden) so your existing app.js tab logic still works -->
+        <div class="tabs tabs-hidden">
+          <button class="tab" data-tab="workout">Workout</button>
+          <button class="tab" data-tab="templates">Programs</button>
+          <button class="tab" data-tab="library">Library</button>
+          <button class="tab" data-tab="history">History</button>
+          <button class="tab" data-tab="progress">Progress</button>
+        </div>
 
-        <!-- Templates -->
-        <div class="panel" id="tab-templates">
-          <h2>Programs</h2>
+        <!-- Templates -->
+        <div class="panel" id="tab-templates">
+          <h2>Programs</h2>
 
-          <div class="row">
-            <input id="tplName" placeholder="Program name (e.g., Push A)" />
-            <button id="createTplBtn">Create</button>
-          </div>
+          <div class="row">
+            <input id="tplName" placeholder="Program name (e.g., Push A)" />
+            <button id="createTplBtn">Create</button>
+          </div>
 
-          <div id="templatesList" class="stack"></div>
-        </div>
+          <div id="templatesList" class="stack"></div>
+        </div>
 
-        <!-- Workout -->
-        <div class="panel hidden" id="tab-workout">
-          <h2>Start workout</h2>
-          <div class="row">
-            <select id="startTplSelect"></select>
-            <button id="startWorkoutBtn">Start</button>
-          </div>
+        <!-- Workout -->
+        <div class="panel hidden" id="tab-workout">
+          <h2>Start workout</h2>
+          <!-- Start controls: keep dropdown left, Start button right (especially on mobile) -->
+          <div class="row start-row">
+            <select id="startTplSelect"></select>
+            <button id="startWorkoutBtn">Start</button>
+          </div>
 
-          <div id="activeWorkout" class="stack"></div>
-          <button id="saveWorkoutBtn" class="hidden">Save workout</button>
-          <p class="muted" id="workoutMsg"></p>
-        </div>
+          <div id="activeWorkout" class="stack"></div>
+          <button id="saveWorkoutBtn" class="hidden">Save workout</button>
+          <p class="muted" id="workoutMsg"></p>
+        </div>
 
-        <!-- Library -->
-        <div class="panel hidden" id="tab-library">
-          <h2>Exercise library</h2>
-          <input id="exerciseSearch" placeholder="Search exercises..." />
-          <div id="exerciseList" class="stack"></div>
-        </div>
+        <!-- Library -->
+        <div class="panel hidden" id="tab-library">
+          <h2>Exercise library</h2>
+          <input id="exerciseSearch" placeholder="Search exercises..." />
+          <div id="exerciseList" class="stack"></div>
+        </div>
 
-        <!-- History -->
-        <div class="panel hidden" id="tab-history">
-          <div class="row" style="justify-content: space-between; align-items: center;">
-            <h2 style="margin:0;">History</h2>
+        <!-- History -->
+        <div class="panel hidden" id="tab-history">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <h2 style="margin:0;">History</h2>
 
-            <select id="historyFilter">
-              <option value="20" selected>Last 20</option>
-              <option value="50">Last 50</option>
-              <option value="200">Last 200</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="all">All</option>
-            </select>
-          </div>
+            <select id="historyFilter">
+              <option value="20" selected>Last 20</option>
+              <option value="50">Last 50</option>
+              <option value="200">Last 200</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All</option>
+            </select>
+          </div>
 
-          <div id="historyDetail" class="stack hidden"></div>
-          <div id="historyList" class="stack"></div>
-        </div>
+          <div id="historyDetail" class="stack hidden"></div>
+          <div id="historyList" class="stack"></div>
+        </div>
 
-        <!-- Progress -->
-        <div class="panel hidden" id="tab-progress">
-          <h2>Progress & PRs</h2>
+        <!-- Progress -->
+        <div class="panel hidden" id="tab-progress">
+          <h2>Progress & PRs</h2>
 
-          <div class="row">
-            <input id="progressSearch" placeholder="Search exercise (e.g., Bench Press)..." />
-          </div>
+          <div class="row">
+            <input id="progressSearch" placeholder="Search exercise (e.g., Bench Press)..." />
+          </div>
 
-          <div id="progressSearchResults" class="stack"></div>
-          <div id="progressView" class="stack"></div>
-        </div>
-      </section>
-    </main>
+          <div id="progressSearchResults" class="stack"></div>
+          <div id="progressView" class="stack"></div>
+        </div>
+      </section>
+    </main>
 
 <script type="module" src="./app.js?v=3"></script>
-  </body>
+  </body>
 </html>
