@@ -104,99 +104,14 @@ button:disabled {
 }
 
 /* Cards/items */
-.card,
-.item {
-  background: rgba(12, 25, 45, 0.45);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+.card, .item, .panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 
-  border-radius: 20px;
-  overflow: hidden;
-}
-
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255,255,255,0.08) 0%,
-    rgba(255,255,255,0.02) 40%,
-    rgba(255,255,255,0.00) 60%
-  );
-  pointer-events: none;
-}
-/* ===== Premium glass utility for all cards ===== */
-.glass-card {
-  position: relative;
-  background: rgba(12, 25, 45, 0.65);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-
-  border: 1px solid rgba(255, 255, 255, 0.08);
-
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.05),
-    0 10px 40px rgba(0, 0, 0, 0.55),
-    0 0 80px rgba(0, 120, 255, 0.08);
-
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.glass-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255,255,255,0.08) 0%,
-    rgba(255,255,255,0.02) 40%,
-    rgba(255,255,255,0.00) 60%
-  );
-  pointer-events: none;
-}
-
-/* Apply glass style to existing UI building blocks */
-.card,
-.item,
-.exercise-card,
-.workout-card,
-.history-card,
-.progress-card {
-  position: relative;
-  background: rgba(12, 25, 45, 0.65);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.05),
-    0 10px 40px rgba(0, 0, 0, 0.55),
-    0 0 80px rgba(0, 120, 255, 0.08);
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.card::before,
-.item::before,
-.exercise-card::before,
-.workout-card::before,
-.history-card::before,
-.progress-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255,255,255,0.08) 0%,
-    rgba(255,255,255,0.02) 40%,
-    rgba(255,255,255,0.00) 60%
-  );
-  pointer-events: none;
-}
 .item {
   background: var(--surface-2);
   padding: 12px;
@@ -260,13 +175,19 @@ main {
   gap: 16px;
 }
 
-.title-block h1 { margin: 0; }
+.title-block h1 {
+  margin: 0;
+  /* Keep the header title on one line */
+  white-space: nowrap;
+}
 
 .subtitle {
   font-style: italic;
   opacity: 0.7;
   margin-top: 4px;
   letter-spacing: 0.4px;
+  /* Keep subtitle on one line */
+  white-space: nowrap;
 }
 
 /* ==========================================================
@@ -438,74 +359,45 @@ a:hover {
   margin-top: 8px;
   display: block;
 }
-/* Workout two-column layout */
-.workout-row {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-}
 
-.workout-left {
-  flex: 1;
-}
+/* ==========================================================
+   MOBILE POLISH
+   (CSS-only: no JS changes / no functional changes)
+   ========================================================== */
 
-.workout-right {
-  width: 220px;
-  flex-shrink: 0;
-}
-
-/* Make responsive */
-@media (max-width: 900px) {
-  .workout-row {
-    flex-direction: column;
-  }
-  .workout-right {
-    width: 100%;
-  }
-}
-.workout-row {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-
-.workout-left {
-  flex: 1;
-}
-
-.workout-right {
-  width: 200px;
-  flex-shrink: 0;
-}
-.workout-left input {
-  width: 80px;
-  max-width: 80px;
-}
-@media (max-width: 600px) {
-  .workout-row {
-    gap: 16px;
+@media (max-width: 520px) {
+  /* Reduce the tall header area so the main card sits higher */
+  header.topbar {
+    padding: 10px 16px;
   }
 
-  .workout-right {
-    width: 150px;
+  main {
+    padding-top: 8px;
   }
 
-  .workout-left input {
-    width: 70px;
-    max-width: 70px;
+  /* Slightly smaller header typography on narrow screens */
+  .title-block {
+    gap: 2px;
   }
-}
-@media (max-width: 600px) {
-  .workout-row {
-    gap: 16px;
+  .title-block h1 {
+    font-size: 26px;
+    line-height: 1.1;
   }
-
-  .workout-right {
-    width: 150px;
+  .subtitle {
+    font-size: 14px;
   }
 
-  .workout-left input {
-    width: 70px;
-    max-width: 70px;
+  /* Start workout controls: dropdown left, Start button right */
+  #tab-workout .start-row {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  #tab-workout .start-row select {
+    flex: 1;
+    min-width: 0;
+  }
+  #tab-workout .start-row button {
+    margin-left: auto;
+    white-space: nowrap;
   }
 }
