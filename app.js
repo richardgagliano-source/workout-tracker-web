@@ -1075,7 +1075,21 @@ function renderActiveWorkout() {
     };
 
     renderSets();
-    card.append(h, setsBox, addSet);
+ // Create two-column layout
+const bodyWrap = document.createElement("div");
+bodyWrap.className = "workout-row";
+
+const leftCol = document.createElement("div");
+leftCol.className = "workout-left";
+leftCol.append(setsBox, addSet);
+
+const rightCol = document.createElement("div");
+rightCol.className = "workout-right";
+rightCol.innerHTML = renderVideoThumb(item.video_link);
+
+bodyWrap.append(leftCol, rightCol);
+
+card.append(h, bodyWrap);
     host.appendChild(card);
   });
 }
@@ -1110,22 +1124,28 @@ $("startWorkoutBtn").addEventListener("click", async () => {
     const weInserted = await createWorkoutExercises(workout.id, tpl.items);
     const nameByExerciseId = new Map(tpl.items.map((it) => [it.exercise_id, it.exercise_name]));
 
-    activeWorkout = {
-      workoutId: workout.id,
-      items: (weInserted || [])
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-        .map((we) => {
-          const prevSets = lastSetsMap.get(we.exercise_id);
-          return {
-            workoutExerciseId: we.id,
-            exerciseId: we.exercise_id,
-            exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
-            sets: (prevSets && prevSets.length)
-              ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
-              : [{ set_index: 0, weight: "", reps: "" }],
-          };
-        }),
-    };
+// Fetch video links for these exercises
+const exIds = tpl.items.map(it => it.exercise_id).join(",");
+const videoRows = await fetchJSON(`/rest/v1/exercises?id=in.(${exIds})&select=id,video_link`);
+const videoMap = new Map((videoRows || []).map(v => [v.id, v.video_link]));
+
+activeWorkout = {
+  workoutId: workout.id,
+  items: (weInserted || [])
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((we) => {
+      const prevSets = lastSetsMap.get(we.exercise_id);
+      return {
+        workoutExerciseId: we.id,
+        exerciseId: we.exercise_id,
+        exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+        video_link: videoMap.get(we.exercise_id) || "",
+        sets: (prevSets && prevSets.length)
+          ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
+          : [{ set_index: 0, weight: "", reps: "" }],
+      };
+    }),
+};
 
     renderActiveWorkout();
     show($("saveWorkoutBtn"));
