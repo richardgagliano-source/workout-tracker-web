@@ -1020,7 +1020,7 @@ function renderActiveWorkout() {
   const host = $("activeWorkout");
   host.innerHTML = "";
   if (!activeWorkout) {
-    host.innerHTML = `<div class="muted">No active workout. Choose a template and press Start.</div>`;
+    host.innerHTML = `<div class="muted">Select a program, press "Start" and let's get that puss poppin', bb! </div>`;
     return;
   }
 
