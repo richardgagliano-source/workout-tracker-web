@@ -127,5 +127,19 @@
     </main>
 
 <script type="module" src="./app.js?v=3"></script>
+    <!-- Save Workout GIF modal -->
+<div id="saveGifModal" class="gif-modal hidden" aria-hidden="true">
+  <div class="gif-modal__backdrop"></div>
+  <div class="gif-modal__card" role="dialog" aria-modal="true">
+    <img
+      id="saveGifImg"
+      class="gif-modal__img"
+      src="https://media.giphy.com/media/111ebonMs90YLu/giphy.gif"
+      alt="Workout saved!"
+    />
+    <div class="gif-modal__text">Saved ✅</div>
+    <button id="closeGifModalBtn" class="gif-modal__close" type="button">Close</button>
+  </div>
+</div>
   </body>
 </html>
