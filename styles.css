@@ -401,3 +401,29 @@ a:hover {
     white-space: nowrap;
   }
 }
+.set-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin:10px 0;
+}
+
+.mini-control{
+  height:44px;
+  border-radius:12px;
+  font-size:16px;   /* prevents iOS zoom */
+  padding:0 12px;
+  box-sizing:border-box;
+}
+
+/* weight + reps mini */
+.set-row input.mini-control{
+  width:72px;
+  text-align:center;
+}
+
+/* remove button same size */
+.set-row button.mini-control{
+  width:72px;
+  padding:0;
+}
