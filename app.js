@@ -1497,6 +1497,8 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
     }
 
     setWorkoutMsg(`Saved ✅${prMsg}`);
+    showSaveGifModal();
+setTimeout(hideSaveGifModal, 1400);
     activeWorkout = null;
     hide($("saveWorkoutBtn"));
     renderActiveWorkout();
