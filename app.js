@@ -30,6 +30,28 @@ const show = (el) => el.classList.remove("hidden");
 const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
+
+const $ = (id) => document.getElementById(id);
+
+function setAuthMsg(msg) { ... }
+function setWorkoutMsg(msg) { ... }
+
+/* ===== ADD THIS RIGHT HERE ===== */
+
+function showSaveGifModal() {
+  const modal = document.getElementById("saveGifModal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function hideSaveGifModal() {
+  const modal = document.getElementById("saveGifModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+}
+
 // --------------------
 // Hamburger menu: open/close + tab navigation
 // --------------------
@@ -1812,7 +1834,16 @@ sb.auth.onAuthStateChange(async (_event, session) => {
     hide($("appSection"));
   }
 });
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("saveGifModal");
+  if (!modal || modal.classList.contains("hidden")) return;
 
+  if (e.target.classList.contains("gif-modal__backdrop")) {
+    hideSaveGifModal();
+  }
+});
+
+document.getElementById("closeGifModalBtn")?.addEventListener("click", hideSaveGifModal);
 // initial session check
 (async () => {
   try {
