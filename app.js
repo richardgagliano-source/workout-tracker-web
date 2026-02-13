@@ -1034,37 +1034,39 @@ function renderActiveWorkout() {
     setsBox.className = "stack";
 
     function renderSets() {
-      setsBox.innerHTML = "";
-      item.sets.forEach((s, si) => {
-        const row = document.createElement("div");
-        row.className = "row";
+  setsBox.innerHTML = "";
+  item.sets.forEach((s, si) => {
+    const row = document.createElement("div");
+    row.className = "set-row"; // was "row"
 
-        const w = document.createElement("input");
-        w.placeholder = "weight";
-        w.inputMode = "decimal";
-        w.value = s.weight ?? "";
-        w.oninput = () => (s.weight = w.value);
+    const w = document.createElement("input");
+    w.className = "mini-control";
+    w.placeholder = "wt";          // optional: shorter on mobile
+    w.inputMode = "decimal";
+    w.value = s.weight ?? "";
+    w.oninput = () => (s.weight = w.value);
 
-        const r = document.createElement("input");
-        r.placeholder = "reps";
-        r.inputMode = "numeric";
-        r.value = s.reps ?? "";
-        r.oninput = () => (s.reps = r.value);
+    const r = document.createElement("input");
+    r.className = "mini-control";
+    r.placeholder = "reps";
+    r.inputMode = "numeric";
+    r.value = s.reps ?? "";
+    r.oninput = () => (s.reps = r.value);
 
-        const del = document.createElement("button");
-        del.className = "secondary";
-        del.textContent = "Remove";
-        del.onclick = () => {
-          item.sets = item.sets
-            .filter((_, j) => j !== si)
-            .map((x, j) => ({ ...x, set_index: j }));
-          renderSets();
-        };
+    const del = document.createElement("button");
+    del.className = "mini-control secondary"; // add mini-control
+    del.textContent = "Remove";
+    del.onclick = () => {
+      item.sets = item.sets
+        .filter((_, j) => j !== si)
+        .map((x, j) => ({ ...x, set_index: j }));
+      renderSets();
+    };
 
-        row.append(w, r, del);
-        setsBox.appendChild(row);
-      });
-    }
+    row.append(w, r, del);
+    setsBox.appendChild(row);
+  });
+}
 
     const addSet = document.createElement("button");
     addSet.className = "secondary";
