@@ -378,3 +378,35 @@ a:hover {
     width: 100%;
   }
 }
+.workout-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.workout-left {
+  flex: 1;
+}
+
+.workout-right {
+  width: 200px;
+  flex-shrink: 0;
+}
+.workout-left input {
+  width: 80px;
+  max-width: 80px;
+}
+@media (max-width: 600px) {
+  .workout-row {
+    gap: 16px;
+  }
+
+  .workout-right {
+    width: 150px;
+  }
+
+  .workout-left input {
+    width: 70px;
+    max-width: 70px;
+  }
+}
