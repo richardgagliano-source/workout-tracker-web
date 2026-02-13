@@ -427,3 +427,8 @@ a:hover {
   width:72px;
   padding:0;
 }
+.add-set-btn{
+  display:block;
+  width:72px;
+  margin-top:10px;
+}
