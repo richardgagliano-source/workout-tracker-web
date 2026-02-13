@@ -410,3 +410,17 @@ a:hover {
     max-width: 70px;
   }
 }
+@media (max-width: 600px) {
+  .workout-row {
+    gap: 16px;
+  }
+
+  .workout-right {
+    width: 150px;
+  }
+
+  .workout-left input {
+    width: 70px;
+    max-width: 70px;
+  }
+}
