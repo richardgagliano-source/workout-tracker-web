@@ -115,20 +115,18 @@ button:disabled {
 
 /* ===== OUTER CARDS (main layers) ===== */
 .card, .panel {
-  background: rgba(12, 25, 45, 0.42);              /* transparent */
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-color: rgba(255,255,255,0.08);
+  background: rgba(12, 25, 45, 0.30);   /* more transparent */
+  backdrop-filter: blur(24px);          /* stronger blur */
+  -webkit-backdrop-filter: blur(24px);
+  border-color: rgba(255,255,255,0.10);
 }
 
 /* ===== INNER RECORD CARDS (library rows, history rows, etc.) ===== */
 .item {
-  background: rgba(12, 25, 45, 0.28);              /* more transparent to show layering */
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-color: rgba(255,255,255,0.06);
-  padding: 12px;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+  background: rgba(12, 25, 45, 0.20);   /* more transparent */
+  backdrop-filter: blur(18px);          /* stronger blur */
+  -webkit-backdrop-filter: blur(18px);
+  border-color: rgba(255,255,255,0.08);
 }
 
 /* ===== Premium glass highlight (subtle sheen) ===== */
@@ -138,9 +136,9 @@ button:disabled {
   inset: 0;
   background: linear-gradient(
     135deg,
-    rgba(255,255,255,0.10) 0%,
-    rgba(255,255,255,0.03) 38%,
-    rgba(255,255,255,0.00) 62%
+    rgba(255,255,255,0.16) 0%,
+    rgba(255,255,255,0.06) 35%,
+    rgba(255,255,255,0.00) 65%
   );
   pointer-events: none;
 }
@@ -151,8 +149,8 @@ button:disabled {
   inset: 0;
   background: linear-gradient(
     135deg,
-    rgba(255,255,255,0.07) 0%,
-    rgba(255,255,255,0.02) 45%,
+    rgba(255,255,255,0.12) 0%,
+    rgba(255,255,255,0.04) 45%,
     rgba(255,255,255,0.00) 70%
   );
   pointer-events: none;
