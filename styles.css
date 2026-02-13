@@ -353,3 +353,28 @@ a:hover {
   margin-top: 8px;
   display: block;
 }
+/* Workout two-column layout */
+.workout-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.workout-left {
+  flex: 1;
+}
+
+.workout-right {
+  width: 220px;
+  flex-shrink: 0;
+}
+
+/* Make responsive */
+@media (max-width: 900px) {
+  .workout-row {
+    flex-direction: column;
+  }
+  .workout-right {
+    width: 100%;
+  }
+}
