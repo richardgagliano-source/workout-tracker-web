@@ -1465,14 +1465,22 @@ function wireProgressSearch() {
 // Save workout sets (+ PR detection)
 $("saveWorkoutBtn").addEventListener("click", async () => {
   if (!activeWorkout) return;
+
+  const btn = $("saveWorkoutBtn");
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Saving...";
+
   try {
     const userId = getUserIdOrThrow();
 
     const rows = [];
     for (const item of activeWorkout.items) {
       for (const s of item.sets) {
-        const hasAny = String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
+        const hasAny =
+          String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
         if (!hasAny) continue;
+
         rows.push({
           workout_exercise_id: item.workoutExerciseId,
           set_index: s.set_index,
@@ -1490,7 +1498,7 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
     try {
       const prs = await detectPRsForWorkout(userId, activeWorkout.items);
       if (prs.length) {
-        const lines = prs.map(p => {
+        const lines = prs.map((p) => {
           const bits = [];
           if (p.newMaxWeight != null) bits.push(`Max weight PR: ${p.newMaxWeight}`);
           if (p.newBestE1RM != null) bits.push(`e1RM PR: ${p.newBestE1RM.toFixed(1)}`);
@@ -1507,9 +1515,13 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
     hide($("saveWorkoutBtn"));
     renderActiveWorkout();
     await refreshHistory();
+
   } catch (err) {
     console.error(err);
     alert(String(err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
   }
 });
 
