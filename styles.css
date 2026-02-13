@@ -134,7 +134,74 @@ button:disabled {
   );
   pointer-events: none;
 }
+/* ===== Premium glass utility for all cards ===== */
+.glass-card {
+  position: relative;
+  background: rgba(12, 25, 45, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.05),
+    0 10px 40px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(0, 120, 255, 0.08);
+
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.08) 0%,
+    rgba(255,255,255,0.02) 40%,
+    rgba(255,255,255,0.00) 60%
+  );
+  pointer-events: none;
+}
+
+/* Apply glass style to existing UI building blocks */
+.card,
+.item,
+.exercise-card,
+.workout-card,
+.history-card,
+.progress-card {
+  position: relative;
+  background: rgba(12, 25, 45, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.05),
+    0 10px 40px rgba(0, 0, 0, 0.55),
+    0 0 80px rgba(0, 120, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.card::before,
+.item::before,
+.exercise-card::before,
+.workout-card::before,
+.history-card::before,
+.progress-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.08) 0%,
+    rgba(255,255,255,0.02) 40%,
+    rgba(255,255,255,0.00) 60%
+  );
+  pointer-events: none;
+}
 .item {
   background: var(--surface-2);
   padding: 12px;
