@@ -22,7 +22,7 @@ html, body {
 
   background-image: url("./progress-pride.png");
   background-size: cover;
-  background-position: center;
+  background-position: top center;
   background-repeat: no-repeat;
 }
 /* Fix iOS centering/overflow when using width:100% + padding */
