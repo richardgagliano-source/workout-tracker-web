@@ -554,7 +554,7 @@ tParams.set("limit", "200");
   // 2) Template exercises rows
   const tplIds = templates.map((t) => t.id).join(",");
   const teParams = new URLSearchParams();
-  teParams.set("select", "id,template_id,exercise_id,order_index");
+  teParams.set("select", "id,template_id,exercise_id,order_index,group_id,group_order,group_label,notes");
   teParams.set("template_id", `in.(${tplIds})`);
   teParams.set("order", "order_index.asc");
   teParams.set("limit", "5000");
@@ -608,10 +608,17 @@ tParams.set("limit", "200");
     }));
 
     // ALSO: provide "items" so your Workout Start code won’t break
-    const items = exercises.map((x) => ({
-      exercise_id: x.exercise_id,
-      order_index: x.order_index ?? 0,
-      exercise_name: x.name,
+    // Include superset fields so workouts can render grouped cards.
+    const items = workout_template_exercises.map((r) => ({
+      exercise_id: r.exercise_id,
+      order_index: r.order_index ?? 0,
+      exercise_name: r.exercises?.name || "(unknown exercise)",
+      group_id: r.group_id ?? null,
+      group_order: r.group_order ?? null,
+      group_label: r.group_label ?? null,
+      notes: r.notes ?? null,
+      // keep for editor convenience
+      wte_id: r.id,
     }));
 
     return {
@@ -1118,6 +1125,12 @@ async function createWorkoutExercises(workoutId, templateItems) {
     workout_id: workoutId,
     exercise_id: it.exercise_id,
     order_index: it.order_index,
+    // Superset / grouping fields (nullable)
+    group_id: it.group_id ?? null,
+    group_order: it.group_order ?? null,
+    // Keep the original template grouping for later "Ungroup" (session-only) if desired
+    original_group: it.group_id ?? null,
+    is_skipped: false,
   }));
   const created = await fetchJSON(`/rest/v1/workout_exercises`, { method: "POST", body });
   return created || [];
@@ -1132,156 +1145,190 @@ async function insertSets(rows) {
 function renderActiveWorkout() {
   const host = $("activeWorkout");
   if (!host) return;
-
   host.innerHTML = "";
-  if (!activeWorkout || !activeWorkout.items || activeWorkout.items.length === 0) {
-    host.innerHTML = `<div class="muted">No active workout. Choose a template and press Start.</div>`;
+
+  if (!activeWorkout) {
+    host.innerHTML = `<div class="muted">No active workout. Choose a program and press Start.</div>`;
     return;
   }
 
-  // Render in order, but group items that share a supersetId into one card
-  const renderedSupersets = new Set();
-  const itemsInOrder = (activeWorkout.items || []).filter((it) => !it.isSkipped);
+  // Helpers for per-exercise sets UI
+  function renderSetsUI(item, setsBox) {
+    setsBox.innerHTML = "";
+    item.sets.forEach((s, si) => {
+      const row = document.createElement("div");
+      row.className = "row";
 
-  function makeSetRow(item, s, si, setsBox, onRerender) {
-    const row = document.createElement("div");
-    row.className = "row workout-inputs";
+      const w = document.createElement("input");
+      w.placeholder = "weight";
+      w.inputMode = "decimal";
+      w.value = s.weight ?? "";
+      w.oninput = () => (s.weight = w.value);
 
-    const w = document.createElement("input");
-    w.placeholder = "wt";
-    w.inputMode = "decimal";
-    w.value = s.weight ?? "";
-    w.oninput = () => (s.weight = w.value);
+      const r = document.createElement("input");
+      r.placeholder = "reps";
+      r.inputMode = "numeric";
+      r.value = s.reps ?? "";
+      r.oninput = () => (s.reps = r.value);
 
-    const r = document.createElement("input");
-    r.placeholder = "reps";
-    r.inputMode = "numeric";
-    r.value = s.reps ?? "";
-    r.oninput = () => (s.reps = r.value);
+      const del = document.createElement("button");
+      del.className = "secondary";
+      del.textContent = "Remove";
+      del.onclick = () => {
+        item.sets = item.sets
+          .filter((_, j) => j !== si)
+          .map((x, j) => ({ ...x, set_index: j }));
+        renderSetsUI(item, setsBox);
+      };
 
-    const del = document.createElement("button");
-    del.className = "secondary";
-    del.textContent = "Remove";
-    del.onclick = () => {
-      item.sets = item.sets
-        .filter((_, j) => j !== si)
-        .map((x, j) => ({ ...x, set_index: j }));
-      onRerender();
-    };
-
-    row.append(w, r, del);
-    setsBox.appendChild(row);
+      row.append(w, r, del);
+      setsBox.appendChild(row);
+    });
   }
 
-  function renderExerciseColumn(item) {
-    const col = document.createElement("div");
-    col.className = "superset-col";
-
-    const h = document.createElement("h3");
-    h.textContent = item.exerciseName || "Exercise";
-
-    const setsBox = document.createElement("div");
-    setsBox.className = "stack";
-
-    const renderSets = () => {
-      setsBox.innerHTML = "";
-      (item.sets || []).forEach((s, si) => makeSetRow(item, s, si, setsBox, renderSets));
-    };
-
+  function addSetButton(item, setsBox) {
     const addSet = document.createElement("button");
     addSet.className = "secondary";
     addSet.textContent = "Add set";
     addSet.onclick = () => {
       item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
-      renderSets();
+      renderSetsUI(item, setsBox);
     };
+    return addSet;
+  }
 
-    // Optional per-workout controls (don’t change the program)
-    const tools = document.createElement("div");
-    tools.className = "row superset-tools";
+  // Group items by group_id (supersets). group_id null => standalone
+  const items = (activeWorkout.items || []).filter((it) => !it.is_skipped);
+  const groups = [];
+  const seen = new Set();
+
+  // deterministic order by order_index (or fallback)
+  const ordered = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  for (const it of ordered) {
+    if (seen.has(it.workoutExerciseId)) continue;
+
+    const gid = it.group_id || null;
+    if (!gid) {
+      groups.push({ type: "single", items: [it] });
+      seen.add(it.workoutExerciseId);
+      continue;
+    }
+
+    const members = ordered
+      .filter((x) => x.group_id === gid)
+      .sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0));
+
+    members.forEach((m) => seen.add(m.workoutExerciseId));
+    groups.push({ type: "superset", group_id: gid, items: members.slice(0, 3) });
+  }
+
+  for (const g of groups) {
+    if (g.type === "single") {
+      const item = g.items[0];
+
+      const card = document.createElement("div");
+      card.className = "item";
+
+      const h = document.createElement("div");
+      h.className = "row";
+      h.style.justifyContent = "space-between";
+      h.style.alignItems = "center";
+
+      const title = document.createElement("h3");
+      title.textContent = item.exerciseName || "Exercise";
+
+      const removeEx = document.createElement("button");
+      removeEx.className = "secondary";
+      removeEx.textContent = "Remove";
+      removeEx.onclick = () => {
+        // session-only: hide this exercise
+        item.is_skipped = true;
+        renderActiveWorkout();
+      };
+
+      h.append(title, removeEx);
+
+      const setsBox = document.createElement("div");
+      setsBox.className = "stack";
+      renderSetsUI(item, setsBox);
+
+      card.append(h, setsBox, addSetButton(item, setsBox));
+      host.appendChild(card);
+      continue;
+    }
+
+    // Superset card
+    const members = g.items;
+
+    const card = document.createElement("div");
+    card.className = "item";
+    card.classList.add("superset-card");
+
+    const head = document.createElement("div");
+    head.className = "row";
+    head.style.justifyContent = "space-between";
+    head.style.alignItems = "center";
+
+    const label = document.createElement("h3");
+    label.textContent = members.length === 2 ? "Superset" : "Tri-set";
 
     const ungroupBtn = document.createElement("button");
     ungroupBtn.className = "secondary";
     ungroupBtn.textContent = "Ungroup";
     ungroupBtn.onclick = () => {
-      item.supersetId = null;
+      // session-only: remove grouping (does not touch the program/template)
+      members.forEach((m) => {
+        m.group_id = null;
+        m.group_order = null;
+      });
       renderActiveWorkout();
     };
 
-    const skipBtn = document.createElement("button");
-    skipBtn.className = "secondary";
-    skipBtn.textContent = "Skip";
-    skipBtn.onclick = () => {
-      item.isSkipped = true;
-      renderActiveWorkout();
-    };
+    head.append(label, ungroupBtn);
 
-    // Show tools only if applicable (keeps UI cleaner on non-superset items)
-    if (item.supersetId) tools.append(ungroupBtn);
-    tools.append(skipBtn);
+    const grid = document.createElement("div");
+    grid.className = "superset-grid";
+    // inline fallback so it works even if css isn't updated yet
+    grid.style.display = "grid";
+    grid.style.gap = "12px";
+    grid.style.gridTemplateColumns = `repeat(${members.length}, minmax(0, 1fr))`;
 
-    renderSets();
-    col.append(h, tools, setsBox, addSet);
-    return col;
-  }
+    members.forEach((item, idx) => {
+      const col = document.createElement("div");
+      col.className = "superset-col";
 
-  itemsInOrder.forEach((item) => {
-    if (item.supersetId) {
-      if (renderedSupersets.has(item.supersetId)) return;
+      const colHead = document.createElement("div");
+      colHead.className = "row";
+      colHead.style.justifyContent = "space-between";
+      colHead.style.alignItems = "center";
 
-      const groupItems = itemsInOrder.filter((x) => x.supersetId === item.supersetId);
-      renderedSupersets.add(item.supersetId);
+      const t = document.createElement("div");
+      t.style.fontWeight = "700";
+      t.textContent = item.exerciseName || `Exercise ${idx + 1}`;
 
-      const card = document.createElement("div");
-      card.className = "item superset-card";
+      const hideBtn = document.createElement("button");
+      hideBtn.className = "secondary";
+      hideBtn.textContent = "Remove";
+      hideBtn.onclick = () => {
+        item.is_skipped = true; // session-only
+        renderActiveWorkout();
+      };
 
-      const grid = document.createElement("div");
-      grid.className = "superset-grid";
-      grid.style.gridTemplateColumns = `repeat(${groupItems.length}, minmax(0, 1fr))`;
+      colHead.append(t, hideBtn);
 
-      groupItems.forEach((gi) => grid.appendChild(renderExerciseColumn(gi)));
+      const setsBox = document.createElement("div");
+      setsBox.className = "stack";
+      renderSetsUI(item, setsBox);
 
-      card.appendChild(grid);
-      host.appendChild(card);
-    } else {
-      const card = document.createElement("div");
-      card.className = "item";
+      col.append(colHead, setsBox, addSetButton(item, setsBox));
+      grid.appendChild(col);
+    });
 
-      const col = renderExerciseColumn(item);
-      // In non-superset mode, we don't need the extra column wrapper styles
-      col.classList.remove("superset-col");
-      card.appendChild(col);
-
-      host.appendChild(card);
-    }
-  });
-}
-
-
-    const addSet = document.createElement("button");
-addSet.className = "secondary mini-control add-set-btn";
-    addSet.textContent = "Add set";
-    addSet.onclick = () => {
-      item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
-      renderSets();
-    };
-
-    renderSets();
- // Create two-column layout
-const bodyWrap = document.createElement("div");
-bodyWrap.className = "workout-row";
-
-const leftCol = document.createElement("div");
-leftCol.className = "workout-left";
-leftCol.append(setsBox, addSet);
-
-bodyWrap.append(leftCol);
-
-card.append(h, bodyWrap);
+    card.append(head, grid);
     host.appendChild(card);
-  });
+  }
 }
-
 // Start workout (autofill last sets if available)
 $("startWorkoutBtn").addEventListener("click", async () => {
 
@@ -1345,6 +1392,11 @@ $("startWorkoutBtn").addEventListener("click", async () => {
             exerciseName:
               nameByExerciseId.get(we.exercise_id) || "Exercise",
             video_link: videoMap.get(we.exercise_id) || "",
+            order_index: we.order_index ?? 0,
+            group_id: we.group_id ?? null,
+            group_order: we.group_order ?? null,
+            original_group: we.original_group ?? (we.group_id ?? null),
+            is_skipped: we.is_skipped ?? false,
             supersetId: ssMap.get(String(we.exercise_id)) || null,
             isSkipped: false,
             sets:
