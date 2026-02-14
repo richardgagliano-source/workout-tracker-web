@@ -527,3 +527,8 @@ button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
+/* Prevent flash before JS determines session */
+body.app-loading #authSection,
+body.app-loading #appSection {
+  display: none !important;
+}
