@@ -31,6 +31,56 @@ const hide = (el) => el.classList.add("hidden");
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
 
+// ----------------------------
+// Supersets (client-side metadata)
+// NOTE: This stores superset grouping in localStorage (no DB migration required).
+// Keyed by templateId so each program can have its own grouping.
+// ----------------------------
+function getSupersetStoreKey(templateId) {
+  return `supersets:${templateId}`;
+}
+
+function loadSupersetMap(templateId) {
+  try {
+    const raw = localStorage.getItem(getSupersetStoreKey(templateId));
+    if (!raw) return new Map();
+    const obj = JSON.parse(raw);
+    return new Map(Object.entries(obj || {}));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveSupersetMap(templateId, map) {
+  try {
+    const obj = Object.fromEntries(map.entries());
+    localStorage.setItem(getSupersetStoreKey(templateId), JSON.stringify(obj));
+  } catch {
+    // ignore
+  }
+}
+
+// Ensure group ids are stable strings
+function newSupersetId() {
+  return `ss_${Math.random().toString(16).slice(2)}_${Date.now()}`;
+}
+
+function groupSize(map, groupId) {
+  let n = 0;
+  for (const [, gid] of map.entries()) if (gid === groupId) n++;
+  return n;
+}
+
+function cleanupSupersetMap(templateId, map) {
+  // Remove groups with <2 exercises
+  const counts = new Map();
+  for (const [, gid] of map.entries()) counts.set(gid, (counts.get(gid) || 0) + 1);
+  for (const [exId, gid] of map.entries()) {
+    if ((counts.get(gid) || 0) < 2) map.delete(exId);
+  }
+  saveSupersetMap(templateId, map);
+}
+
 
 
 
@@ -680,6 +730,8 @@ async function refreshTemplates() {
     const current = (t.workout_template_exercises || [])
       .slice()
       .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const ssMap = loadSupersetMap(t.id);
+
 
     // exercise list
     const ul = document.createElement("div");
@@ -700,6 +752,62 @@ async function refreshTemplates() {
       const actions = document.createElement("div");
       actions.style.display = "flex";
       actions.style.gap = "8px";
+
+      // Superset grouping controls (stored locally per program)
+      const exId = String(x.exercise_id);
+      const gid = ssMap.get(exId) || null;
+
+      const ssBtn = document.createElement("button");
+      ssBtn.className = "secondary";
+
+      if (!gid) {
+        ssBtn.textContent = "Superset +";
+        ssBtn.onclick = () => {
+          const next = current[idx + 1];
+          if (!next) return alert("Put another exercise below this one to create a superset.");
+          const nextId = String(next.exercise_id);
+          const nextGid = ssMap.get(nextId) || null;
+
+          const useGid = nextGid || newSupersetId();
+          if (groupSize(ssMap, useGid) >= 3) return alert("Supersets are limited to 3 exercises.");
+
+          ssMap.set(exId, useGid);
+          ssMap.set(nextId, useGid);
+          cleanupSupersetMap(t.id, ssMap);
+          refreshTemplates();
+        };
+      } else {
+        const next = current[idx + 1] || null;
+        const canAddNext =
+          !!next && groupSize(ssMap, gid) < 3 && !ssMap.get(String(next.exercise_id));
+
+        ssBtn.textContent = canAddNext ? "Add next" : "In superset";
+        ssBtn.disabled = !canAddNext;
+        ssBtn.onclick = () => {
+          if (!next) return;
+          const nextId = String(next.exercise_id);
+          if (ssMap.get(nextId)) return;
+          if (groupSize(ssMap, gid) >= 3) return;
+          ssMap.set(nextId, gid);
+          cleanupSupersetMap(t.id, ssMap);
+          refreshTemplates();
+        };
+      }
+
+      actions.appendChild(ssBtn);
+
+      if (gid) {
+        const ungroupBtn = document.createElement("button");
+        ungroupBtn.className = "secondary";
+        ungroupBtn.textContent = "Ungroup";
+        ungroupBtn.onclick = () => {
+          ssMap.delete(exId);
+          cleanupSupersetMap(t.id, ssMap);
+          refreshTemplates();
+        };
+        actions.appendChild(ungroupBtn);
+      }
+
 
       // UP button
       const up = document.createElement("button");
@@ -1020,57 +1128,135 @@ async function insertSets(rows) {
   await fetchJSON(`/rest/v1/sets`, { method: "POST", body: rows });
 }
 
+
 function renderActiveWorkout() {
   const host = $("activeWorkout");
+  if (!host) return;
+
   host.innerHTML = "";
-  if (!activeWorkout) {
-    host.innerHTML = `<div class="muted">Select a program, press "Start" and let's get that puss poppin', bb! </div>`;
+  if (!activeWorkout || !activeWorkout.items || activeWorkout.items.length === 0) {
+    host.innerHTML = `<div class="muted">No active workout. Choose a template and press Start.</div>`;
     return;
   }
 
-  activeWorkout.items.forEach((item, idx) => {
-    const card = document.createElement("div");
-    card.className = "item";
-    const h = document.createElement("h3");
-    h.textContent = `${idx + 1}. ${item.exerciseName}`;
+  // Render in order, but group items that share a supersetId into one card
+  const renderedSupersets = new Set();
+  const itemsInOrder = (activeWorkout.items || []).filter((it) => !it.isSkipped);
 
-    const setsBox = document.createElement("div");
-    setsBox.className = "stack";
-
-    function renderSets() {
-  setsBox.innerHTML = "";
-  item.sets.forEach((s, si) => {
+  function makeSetRow(item, s, si, setsBox, onRerender) {
     const row = document.createElement("div");
-    row.className = "set-row"; // was "row"
+    row.className = "row workout-inputs";
 
     const w = document.createElement("input");
-    w.className = "mini-control";
-    w.placeholder = "wt";          // optional: shorter on mobile
+    w.placeholder = "wt";
     w.inputMode = "decimal";
     w.value = s.weight ?? "";
     w.oninput = () => (s.weight = w.value);
 
     const r = document.createElement("input");
-    r.className = "mini-control";
     r.placeholder = "reps";
     r.inputMode = "numeric";
     r.value = s.reps ?? "";
     r.oninput = () => (s.reps = r.value);
 
     const del = document.createElement("button");
-    del.className = "mini-control secondary"; // add mini-control
+    del.className = "secondary";
     del.textContent = "Remove";
     del.onclick = () => {
       item.sets = item.sets
         .filter((_, j) => j !== si)
         .map((x, j) => ({ ...x, set_index: j }));
-      renderSets();
+      onRerender();
     };
 
     row.append(w, r, del);
     setsBox.appendChild(row);
+  }
+
+  function renderExerciseColumn(item) {
+    const col = document.createElement("div");
+    col.className = "superset-col";
+
+    const h = document.createElement("h3");
+    h.textContent = item.exerciseName || "Exercise";
+
+    const setsBox = document.createElement("div");
+    setsBox.className = "stack";
+
+    const renderSets = () => {
+      setsBox.innerHTML = "";
+      (item.sets || []).forEach((s, si) => makeSetRow(item, s, si, setsBox, renderSets));
+    };
+
+    const addSet = document.createElement("button");
+    addSet.className = "secondary";
+    addSet.textContent = "Add set";
+    addSet.onclick = () => {
+      item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
+      renderSets();
+    };
+
+    // Optional per-workout controls (don’t change the program)
+    const tools = document.createElement("div");
+    tools.className = "row superset-tools";
+
+    const ungroupBtn = document.createElement("button");
+    ungroupBtn.className = "secondary";
+    ungroupBtn.textContent = "Ungroup";
+    ungroupBtn.onclick = () => {
+      item.supersetId = null;
+      renderActiveWorkout();
+    };
+
+    const skipBtn = document.createElement("button");
+    skipBtn.className = "secondary";
+    skipBtn.textContent = "Skip";
+    skipBtn.onclick = () => {
+      item.isSkipped = true;
+      renderActiveWorkout();
+    };
+
+    // Show tools only if applicable (keeps UI cleaner on non-superset items)
+    if (item.supersetId) tools.append(ungroupBtn);
+    tools.append(skipBtn);
+
+    renderSets();
+    col.append(h, tools, setsBox, addSet);
+    return col;
+  }
+
+  itemsInOrder.forEach((item) => {
+    if (item.supersetId) {
+      if (renderedSupersets.has(item.supersetId)) return;
+
+      const groupItems = itemsInOrder.filter((x) => x.supersetId === item.supersetId);
+      renderedSupersets.add(item.supersetId);
+
+      const card = document.createElement("div");
+      card.className = "item superset-card";
+
+      const grid = document.createElement("div");
+      grid.className = "superset-grid";
+      grid.style.gridTemplateColumns = `repeat(${groupItems.length}, minmax(0, 1fr))`;
+
+      groupItems.forEach((gi) => grid.appendChild(renderExerciseColumn(gi)));
+
+      card.appendChild(grid);
+      host.appendChild(card);
+    } else {
+      const card = document.createElement("div");
+      card.className = "item";
+
+      const col = renderExerciseColumn(item);
+      // In non-superset mode, we don't need the extra column wrapper styles
+      col.classList.remove("superset-col");
+      card.appendChild(col);
+
+      host.appendChild(card);
+    }
   });
 }
+
 
     const addSet = document.createElement("button");
 addSet.className = "secondary mini-control add-set-btn";
@@ -1099,87 +1285,91 @@ card.append(h, bodyWrap);
 // Start workout (autofill last sets if available)
 $("startWorkoutBtn").addEventListener("click", async () => {
 
-  const btn = $("startWorkoutBtn");
-  btn.disabled = true;
-  const originalText = btn.textContent;
-  btn.textContent = "Loading...";
+  const btn = $("startWorkoutBtn");
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Loading...";
 
-  try {
+  try {
 
-    setWorkoutMsg("");
+    setWorkoutMsg("");
 
-    const templateId = $("startTplSelect").value;
-    if (!templateId) throw new Error("Pick a template first.");
+    const templateId = $("startTplSelect").value;
+    if (!templateId) throw new Error("Pick a template first.");
 
-    const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
-    if (!tpl) throw new Error("Template not found. Go to Templates tab and refresh.");
-    if (!tpl.items || tpl.items.length === 0)
-      throw new Error("This template has no exercises yet.");
+    const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
+    if (!tpl) throw new Error("Template not found. Go to Templates tab and refresh.");
+    if (!tpl.items || tpl.items.length === 0)
+      throw new Error("This template has no exercises yet.");
 
-    const userId = getUserIdOrThrow();
+    const userId = getUserIdOrThrow();
 
-    // AUTOFILL attempt (non-blocking)
-    const exerciseIds = tpl.items.map((it) => it.exercise_id).filter(Boolean);
-    let lastSetsMap = new Map();
-    try {
-      lastSetsMap = await loadLastSetsByExercise(userId, exerciseIds);
-    } catch (e) {
-      console.warn("Autofill failed (non-blocking):", e);
-      lastSetsMap = new Map();
-    }
+    // AUTOFILL attempt (non-blocking)
+    const exerciseIds = tpl.items.map((it) => it.exercise_id).filter(Boolean);
+    let lastSetsMap = new Map();
+    try {
+      lastSetsMap = await loadLastSetsByExercise(userId, exerciseIds);
+    } catch (e) {
+      console.warn("Autofill failed (non-blocking):", e);
+      lastSetsMap = new Map();
+    }
 
-    const workout = await createWorkout(userId);
-    if (!workout?.id) throw new Error("Failed to create workout.");
+    const workout = await createWorkout(userId);
+    if (!workout?.id) throw new Error("Failed to create workout.");
 
-    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
-    const nameByExerciseId = new Map(
-      tpl.items.map((it) => [it.exercise_id, it.exercise_name])
-    );
+    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
+    const nameByExerciseId = new Map(
+      tpl.items.map((it) => [it.exercise_id, it.exercise_name])
+    );
 
-    // Fetch video links
-    const exIds = tpl.items.map(it => it.exercise_id).join(",");
-    const videoRows = await fetchJSON(
-      `/rest/v1/exercises?id=in.(${exIds})&select=id,video_link`
-    );
-    const videoMap = new Map(
-      (videoRows || []).map(v => [v.id, v.video_link])
-    );
+    const ssMap = loadSupersetMap(templateId);
 
-    activeWorkout = {
-      workoutId: workout.id,
-      items: (weInserted || [])
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-        .map((we) => {
-          const prevSets = lastSetsMap.get(we.exercise_id);
-          return {
-            workoutExerciseId: we.id,
-            exerciseId: we.exercise_id,
-            exerciseName:
-              nameByExerciseId.get(we.exercise_id) || "Exercise",
-            video_link: videoMap.get(we.exercise_id) || "",
-            sets:
-              prevSets && prevSets.length
-                ? prevSets.map((s, i) => ({
-                    set_index: i,
-                    weight: s.weight ?? "",
-                    reps: s.reps ?? "",
-                  }))
-                : [{ set_index: 0, weight: "", reps: "" }],
-          };
-        }),
-    };
+    // Fetch video links
+    const exIds = tpl.items.map(it => it.exercise_id).join(",");
+    const videoRows = await fetchJSON(
+      `/rest/v1/exercises?id=in.(${exIds})&select=id,video_link`
+    );
+    const videoMap = new Map(
+      (videoRows || []).map(v => [v.id, v.video_link])
+    );
 
-    renderActiveWorkout();
-    show($("saveWorkoutBtn"));
-    setWorkoutMsg("Workout started. Autofilled last weights/reps (if available).");
+    activeWorkout = {
+      workoutId: workout.id,
+      items: (weInserted || [])
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((we) => {
+          const prevSets = lastSetsMap.get(we.exercise_id);
+          return {
+            workoutExerciseId: we.id,
+            exerciseId: we.exercise_id,
+            exerciseName:
+              nameByExerciseId.get(we.exercise_id) || "Exercise",
+            video_link: videoMap.get(we.exercise_id) || "",
+            supersetId: ssMap.get(String(we.exercise_id)) || null,
+            isSkipped: false,
+            sets:
+              prevSets && prevSets.length
+                ? prevSets.map((s, i) => ({
+                    set_index: i,
+                    weight: s.weight ?? "",
+                    reps: s.reps ?? "",
+                  }))
+                : [{ set_index: 0, weight: "", reps: "" }],
+          };
+        }),
+    };
 
-  } catch (err) {
-    console.error(err);
-    alert(String(err.message || err));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
+    renderActiveWorkout();
+    show($("saveWorkoutBtn"));
+    setWorkoutMsg("Workout started. Autofilled last weights/reps (if available).");
+
+  } catch (err) {
+    console.error(err);
+    alert(String(err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 
 });
 // --------------------
@@ -1476,6 +1666,7 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
 
     const rows = [];
     for (const item of activeWorkout.items) {
+      if (item.isSkipped) continue;
       for (const s of item.sets) {
         const hasAny =
           String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
