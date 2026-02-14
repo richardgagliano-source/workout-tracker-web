@@ -115,7 +115,7 @@ button:disabled {
 
 /* ===== OUTER CARDS (main layers) ===== */
 .card, .panel {
-  background: rgba(12, 25, 45, 0.30);   /* more transparent */
+  background: rgba(15, 15, 18, 0.55);   /* more transparent */
   backdrop-filter: blur(24px);          /* stronger blur */
   -webkit-backdrop-filter: blur(24px);
   border-color: rgba(255,255,255,0.10);
@@ -123,7 +123,7 @@ button:disabled {
 
 /* ===== INNER RECORD CARDS (library rows, history rows, etc.) ===== */
 .item {
-  background: rgba(12, 25, 45, 0.20);   /* more transparent */
+  background: rgba(15, 15, 18, 0.55);   /* more transparent */
   backdrop-filter: blur(18px);          /* stronger blur */
   -webkit-backdrop-filter: blur(18px);
   border-color: rgba(255,255,255,0.08);
