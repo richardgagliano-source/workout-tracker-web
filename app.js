@@ -1870,7 +1870,7 @@ sb.auth.onAuthStateChange(async (_event, session) => {
     if (user) {
       hide($("authSection"));
       show($("appSection"));
-      await refreshAll();
+
       // Default to Workout tab on initial load
 document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
 const workoutTabBtn = document.querySelector('.tab[data-tab="workout"]');
@@ -1882,14 +1882,19 @@ if (workoutTabBtn) workoutTabBtn.classList.add("active");
 });
 const workoutPanel = document.getElementById("tab-workout");
 if (workoutPanel) workoutPanel.classList.remove("hidden");
-
+      
+      document.body.classList.remove("app-loading");
+      await refreshAll();
+      
     } else {
       show($("authSection"));
       hide($("appSection"));
+      document.body.classList.remove("app-loading");
     }
   } catch (e) {
     console.error("Initial session check failed:", e);
     show($("authSection"));
     hide($("appSection"));
+    document.body.classList.remove("app-loading");
   }
 })();
