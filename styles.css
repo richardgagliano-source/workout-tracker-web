@@ -532,3 +532,59 @@ body.app-loading #authSection,
 body.app-loading #appSection {
   display: none !important;
 }
+
+
+/* =========================
+   Supersets (workout view)
+   Mobile-first layout
+   ========================= */
+.superset-card {
+  padding: 12px;
+}
+
+.superset-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.superset-col {
+  min-width: 0;
+}
+
+.superset-col h3 {
+  margin: 0 0 8px;
+}
+
+.superset-tools {
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+/* Make weight/reps/remove feel compact and consistent on iPhone */
+.workout-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.workout-inputs input,
+.workout-inputs button {
+  flex: 0 0 84px; /* ~3 chars + padding */
+  max-width: 84px;
+}
+
+.workout-inputs input {
+  text-align: center;
+}
+
+/* Slightly wider on bigger screens */
+@media (min-width: 768px) {
+  .workout-inputs input,
+  .workout-inputs button {
+    flex-basis: 110px;
+    max-width: 110px;
+  }
+}
+
