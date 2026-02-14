@@ -118,15 +118,15 @@ button:disabled {
   background: rgba(15, 15, 18, 0.55);   /* more transparent */
   backdrop-filter: blur(24px);          /* stronger blur */
   -webkit-backdrop-filter: blur(24px);
-  border-color: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.08);
 }
 
 /* ===== INNER RECORD CARDS (library rows, history rows, etc.) ===== */
 .item {
-  background: rgba(15, 15, 18, 0.55);   /* more transparent */
+  background: rgba(20, 20, 24, 0.40);   /* more transparent */
   backdrop-filter: blur(18px);          /* stronger blur */
   -webkit-backdrop-filter: blur(18px);
-  border-color: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.06);
 }
 
 /* ===== Premium glass highlight (subtle sheen) ===== */
