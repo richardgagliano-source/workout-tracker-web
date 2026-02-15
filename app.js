@@ -1173,7 +1173,7 @@ function renderActiveWorkout() {
 
       const del = document.createElement("button");
       del.className = "secondary";
-      del.textContent = "Skip ⏭";
+      del.textContent = "Remove";
       del.onclick = () => {
         item.sets = item.sets
           .filter((_, j) => j !== si)
