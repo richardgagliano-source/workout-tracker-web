@@ -1,3 +1,4 @@
+console.log("APP VERSION: 2026-02-15-A");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1150,7 +1151,7 @@ function renderActiveWorkout() {
   const host = $("activeWorkout");
   if (!host) return;
   host.innerHTML = "";
-
+host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;opacity:.7;">APP VERSION: 2026-02-15-A</div>`);
   if (!activeWorkout) {
     host.innerHTML = `<div class="muted">Select a workout and get that pussy poppin'!</div>`;
     return;
