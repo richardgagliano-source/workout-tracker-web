@@ -768,7 +768,7 @@ async function refreshTemplates() {
       ssBtn.className = "secondary";
 
       if (!gid) {
-        ssBtn.textContent = "Superset +";
+        ssBtn.textContent = "Add next to SuperSet";
         ssBtn.onclick = () => {
           const next = current[idx + 1];
           if (!next) return alert("Put another exercise below this one to create a superset.");
