@@ -1125,14 +1125,18 @@ async function createWorkoutExercises(workoutId, templateItems) {
     workout_id: workoutId,
     exercise_id: it.exercise_id,
     order_index: it.order_index,
-    // Superset / grouping fields (nullable)
     group_id: it.group_id ?? null,
     group_order: it.group_order ?? null,
-    // Keep the original template grouping for later "Ungroup" (session-only) if desired
     original_group: it.group_id ?? null,
     is_skipped: false,
   }));
-  const created = await fetchJSON(`/rest/v1/workout_exercises`, { method: "POST", body });
+
+  const created = await fetchJSON(`/rest/v1/workout_exercises`, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body,
+  });
+
   return created || [];
 }
 
