@@ -1240,7 +1240,7 @@ function renderActiveWorkout() {
 
       const removeEx = document.createElement("button");
       removeEx.className = "secondary";
-      removeEx.textContent = "Remove";
+      removeEx.textContent = "Skip ⏭";
       removeEx.onclick = () => {
         // session-only: hide this exercise
         item.is_skipped = true;
