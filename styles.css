@@ -587,4 +587,16 @@ body.app-loading #appSection {
     max-width: 110px;
   }
 }
+.superset-grid { width: 100%; }
+.superset-col { min-width: 0; }
 
+/* On small screens, allow horizontal scroll for tri-sets */
+@media (max-width: 430px) {
+  .superset-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .superset-col {
+    min-width: 220px;
+  }
+}
