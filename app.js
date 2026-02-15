@@ -822,7 +822,7 @@ async function refreshTemplates() {
       up.textContent = "↑";
       up.disabled = idx === 0;
 
-      // DOWN button  ✅ (this is what you were missing)
+      // DOWN button  
       const down = document.createElement("button");
       down.className = "secondary";
       down.textContent = "↓";
@@ -1240,7 +1240,7 @@ function renderActiveWorkout() {
 
       const removeEx = document.createElement("button");
       removeEx.className = "secondary";
-      removeEx.textContent = "Remove";
+      removeEx.textContent = "Skip ⏭";
       removeEx.onclick = () => {
         // session-only: hide this exercise
         item.is_skipped = true;
