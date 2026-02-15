@@ -1400,9 +1400,19 @@ $("startWorkoutBtn").addEventListener("click", async () => {
     // you can keep or delete this, but it won’t be needed after the change above
     supersetId: ssId,
 
-    sets: (prevSets && prevSets.length)
-      ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
-      : [{ set_index: 0, weight: "", reps: "" }],
+   sets: (() => {
+  if (!prevSets || !prevSets.length) {
+    return [{ set_index: 0, weight: "", reps: "" }];
+  }
+
+  const last = prevSets[prevSets.length - 1];
+
+  return [{
+    set_index: 0,
+    weight: last.weight ?? "",
+    reps: last.reps ?? "",
+  }];
+})(),
   };
 })
     };
