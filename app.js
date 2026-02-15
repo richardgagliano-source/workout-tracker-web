@@ -1379,28 +1379,32 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       items: (weInserted || [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         .map((we) => {
-          const prevSets = lastSetsMap.get(we.exercise_id);
-          return {
-            workoutExerciseId: we.id,
-            exerciseId: we.exercise_id,
-            exerciseName:
-              nameByExerciseId.get(we.exercise_id) || "Exercise",
-            order_index: we.order_index ?? 0,
-            group_id: we.group_id ?? null,
-            group_order: we.group_order ?? null,
-            original_group: we.original_group ?? (we.group_id ?? null),
-            is_skipped: we.is_skipped ?? false,
-            supersetId: ssMap.get(String(we.exercise_id)) || null,
-            sets:
-              prevSets && prevSets.length
-                ? prevSets.map((s, i) => ({
-                    set_index: i,
-                    weight: s.weight ?? "",
-                    reps: s.reps ?? "",
-                  }))
-                : [{ set_index: 0, weight: "", reps: "" }],
-          };
-        }),
+  const prevSets = lastSetsMap.get(we.exercise_id);
+
+  // ✅ superset id from localStorage
+  const ssId = ssMap.get(String(we.exercise_id)) || null;
+
+  return {
+    workoutExerciseId: we.id,
+    exerciseId: we.exercise_id,
+    exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+    order_index: we.order_index ?? 0,
+
+    // ✅ IMPORTANT: fall back to ssId so supersets can render as one card
+    group_id: we.group_id ?? ssId,
+    group_order: we.group_order ?? null,
+    original_group: we.original_group ?? we.group_id ?? ssId,
+
+    is_skipped: we.is_skipped ?? false,
+
+    // you can keep or delete this, but it won’t be needed after the change above
+    supersetId: ssId,
+
+    sets: (prevSets && prevSets.length)
+      ? prevSets.map((s, i) => ({ set_index: i, weight: s.weight ?? "", reps: s.reps ?? "" }))
+      : [{ set_index: 0, weight: "", reps: "" }],
+  };
+})
     };
 
     // --- Avoid window collision with DOM id "activeWorkout" by writing to a safe global ---
