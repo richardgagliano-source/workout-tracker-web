@@ -1208,16 +1208,15 @@ function renderActiveWorkout() {
   for (const it of ordered) {
     if (seen.has(it.workoutExerciseId)) continue;
 
-    const gid = it.group_id || null;
-    if (!gid) {
+const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
       groups.push({ type: "single", items: [it] });
       seen.add(it.workoutExerciseId);
       continue;
     }
 
     const members = ordered
-      .filter((x) => x.group_id === gid)
-      .sort((a, b) => (a.group_order ?? 0) - (b.group_order ?? 0));
+  .filter((x) => (x.group_id ?? x.groupId ?? null) === gid)
+.sort((a, b) => ((a.group_order ?? a.groupOrder ?? 0) - (b.group_order ?? b.groupOrder ?? 0)));
 
     members.forEach((m) => seen.add(m.workoutExerciseId));
     groups.push({ type: "superset", group_id: gid, items: members.slice(0, 3) });
