@@ -1370,15 +1370,6 @@ $("startWorkoutBtn").addEventListener("click", async () => {
 
     const ssMap = loadSupersetMap(templateId);
 
-    // Fetch video links (kept here for library; it's safe — you can remove if you truly never want videos)
-    const exIds = tpl.items.map(it => it.exercise_id).join(",");
-    const videoRows = await fetchJSON(
-      `/rest/v1/exercises?id=in.(${exIds})&select=id,video_link`
-    );
-    const videoMap = new Map(
-      (videoRows || []).map(v => [v.id, v.video_link])
-    );
-
     activeWorkout = {
       workoutId: workout.id,
       items: (weInserted || [])
@@ -1390,7 +1381,6 @@ $("startWorkoutBtn").addEventListener("click", async () => {
             exerciseId: we.exercise_id,
             exerciseName:
               nameByExerciseId.get(we.exercise_id) || "Exercise",
-            video_link: videoMap.get(we.exercise_id) || "",
             order_index: we.order_index ?? 0,
             group_id: we.group_id ?? null,
             group_order: we.group_order ?? null,
