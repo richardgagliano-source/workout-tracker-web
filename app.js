@@ -1152,7 +1152,7 @@ function renderActiveWorkout() {
   host.innerHTML = "";
 
   if (!activeWorkout) {
-    host.innerHTML = `<div class="muted">No active workout. Choose a program and press Start.</div>`;
+    host.innerHTML = `<div class="muted">Select a workout and get that pussy poppin'!</div>`;
     return;
   }
 
