@@ -1153,7 +1153,7 @@ function renderActiveWorkout() {
   host.innerHTML = "";
 host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;opacity:.7;">APP VERSION: 2026-02-15-A</div>`);
   if (!activeWorkout) {
-    host.innerHTML = `<div class="muted">Select a workout and get that pussy poppin'!</div>`;
+    host.innerHTML = `<div class="muted">Select a workout and get that pussy a poppin'!</div>`;
     return;
   }
 
