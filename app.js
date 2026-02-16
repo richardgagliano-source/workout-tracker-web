@@ -1209,7 +1209,13 @@ host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;
 
   // deterministic order by order_index (or fallback)
   const ordered = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-
+// DEBUG: show group ids on mobile
+host.insertAdjacentHTML(
+  "afterbegin",
+  `<div class="muted" style="font-size:11px;opacity:.7;line-height:1.2;word-break:break-word;">
+    GROUPS: ${ordered.map(x => `${x.exerciseName}:${x.group_id ?? x.groupId ?? "null"}`).join(" | ")}
+  </div>`
+);
   for (const it of ordered) {
     if (seen.has(it.workoutExerciseId)) continue;
 
