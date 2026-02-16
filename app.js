@@ -1209,7 +1209,7 @@ host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;
 
   // deterministic order by order_index (or fallback)
   const ordered = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;opacity:.7;">APP VERSION: 2026-02-15-A</div>`);
+
   for (const it of ordered) {
     if (seen.has(it.workoutExerciseId)) continue;
 
