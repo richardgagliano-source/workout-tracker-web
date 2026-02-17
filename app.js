@@ -1364,6 +1364,11 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       lastSetsMap = new Map();
     }
 
+    const workout = await createWorkout(userId);
+    if (!workout?.id) throw new Error("Failed to create workout.");
+
+    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
+
     const nameByExerciseId = new Map((tpl.items || []).map((it) => [it.exercise_id, it.exercise_name]));
 
     // ✅ Map template item by exercise_id (used to pull group_id/group_order if DB insert doesn't return them)
@@ -1371,46 +1376,7 @@ $("startWorkoutBtn").addEventListener("click", async () => {
 
     // ✅ Superset grouping from localStorage (fallback)
     const ssMap = loadSupersetMap(templateId);
-// ✅ Start workout locally ONLY (do not create workout in Supabase yet)
-activeWorkout = {
-  workoutId: null,         // not created until Save
-  templateId,
-  items: (tpl.items || [])
-    .slice()
-    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    .map((it) => {
-      const prevSets = lastSetsMap.get(it.exercise_id) || [];
-      const last = prevSets.length ? prevSets[prevSets.length - 1] : null;
 
-      // superset id from localStorage (fallback grouping)
-      const ssId = ssMap.get(String(it.exercise_id)) || null;
-
-      return {
-        workoutExerciseId: null, // not created until Save
-        exerciseId: it.exercise_id,
-        exerciseName: it.exercise_name || "Exercise",
-        order_index: it.order_index ?? 0,
-
-        // grouping (prefer template group_id, fallback to local ssId)
-        group_id: it.group_id ?? ssId ?? null,
-        group_order: it.group_order ?? null,
-        original_group: it.group_id ?? ssId ?? null,
-
-        is_skipped: false,
-
-        // ✅ only ONE autofill row (the last set)
-        sets: [{
-          set_index: 0,
-          weight: last?.weight ?? "",
-          reps: last?.reps ?? "",
-        }],
-      };
-    }),
-};
-
-// keep your debug global if you want
-window.__workoutState = activeWorkout;
-window.__workoutStateLastUpdated = Date.now();
     activeWorkout = {
       workoutId: workout.id,
       items: (weInserted || [])
@@ -1758,118 +1724,66 @@ function wireProgressSearch() {
 
 // Save workout sets (+ PR detection)
 $("saveWorkoutBtn").addEventListener("click", async () => {
-  if (!activeWorkout) return;
+  if (!activeWorkout) return;
 
-  const btn = $("saveWorkoutBtn");
-  btn.disabled = true;
-  const originalText = btn.textContent;
-  btn.textContent = "Saving...";
+  const btn = $("saveWorkoutBtn");
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Saving...";
 
-  try {
-    const userId = getUserIdOrThrow();
+  try {
+    const userId = getUserIdOrThrow();
 
-    // ✅ If we haven't created the workout in Supabase yet, do it now (only on Save)
-    if (!activeWorkout.workoutId) {
-      const workout = await createWorkout(userId);
-      if (!workout?.id) throw new Error("Failed to create workout.");
-      activeWorkout.workoutId = workout.id;
+    const rows = [];
+    for (const item of activeWorkout.items) {
+      if (item.isSkipped) continue;
+      for (const s of item.sets) {
+        const hasAny =
+          String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
+        if (!hasAny) continue;
 
-      // create workout_exercises from the current activeWorkout order/grouping
-      const body = (activeWorkout.items || []).map((it) => ({
-        workout_id: workout.id,
-        exercise_id: it.exerciseId,
-        order_index: it.order_index ?? 0,
-        group_id: it.group_id ?? null,
-        group_order: it.group_order ?? null,
-        original_group: it.original_group ?? (it.group_id ?? null),
-        is_skipped: !!it.is_skipped, // ✅ consistent key
-      }));
+        rows.push({
+          workout_exercise_id: item.workoutExerciseId,
+          set_index: s.set_index,
+          weight: String(s.weight).trim() === "" ? null : Number(s.weight),
+          reps: String(s.reps).trim() === "" ? null : Number(s.reps),
+          is_warmup: false,
+        });
+      }
+    }
 
-      const created = await fetchJSON(
-        `/rest/v1/workout_exercises?select=id,exercise_id,order_index,group_id,group_order,is_skipped`,
-        {
-          method: "POST",
-          headers: { Prefer: "return=representation" },
-          body,
-        }
-      );
+    await insertSets(rows);
 
-      // Map created rows back onto activeWorkout items so sets can reference workout_exercise_id.
-      // Prefer match by (exercise_id + order_index) to handle duplicates safely.
-      const byKey = new Map(
-        (created || []).map((we) => [
-          `${String(we.exercise_id)}|${String(we.order_index ?? 0)}`,
-          we,
-        ])
-      );
+    // PR detection (best-effort; don’t block save UX)
+    let prMsg = "";
+    try {
+      const prs = await detectPRsForWorkout(userId, activeWorkout.items);
+      if (prs.length) {
+        const lines = prs.map((p) => {
+          const bits = [];
+          if (p.newMaxWeight != null) bits.push(`Max weight PR: ${p.newMaxWeight}`);
+          if (p.newBestE1RM != null) bits.push(`e1RM PR: ${p.newBestE1RM.toFixed(1)}`);
+          return `🏆 ${p.exerciseName} — ${bits.join(" | ")}`;
+        });
+        prMsg = "\n" + lines.join("\n");
+      }
+    } catch (e) {
+      console.warn("PR detection failed (non-blocking):", e);
+    }
 
-      (activeWorkout.items || []).forEach((it) => {
-        const key = `${String(it.exerciseId)}|${String(it.order_index ?? 0)}`;
-        const we = byKey.get(key);
-        if (we) it.workoutExerciseId = we.id;
-      });
-    }
+    setWorkoutMsg(`Saved ✅${prMsg}`);
+    activeWorkout = null;
+    hide($("saveWorkoutBtn"));
+    renderActiveWorkout();
+    await refreshHistory();
 
-    const rows = [];
-    for (const item of activeWorkout.items) {
-      if (item.is_skipped) continue; // ✅ consistent key
-
-      // If user entered any set data but we don't have a workoutExerciseId, stop and explain
-      const hasAnyEntered = (item.sets || []).some(
-        (s) => String(s.weight).trim() !== "" || String(s.reps).trim() !== ""
-      );
-      if (hasAnyEntered && !item.workoutExerciseId) {
-        throw new Error(
-          `Missing workoutExerciseId for "${item.exerciseName}". Try Save again after a refresh.`
-        );
-      }
-
-      for (const s of item.sets) {
-        const hasAny =
-          String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
-        if (!hasAny) continue;
-
-        rows.push({
-          workout_exercise_id: item.workoutExerciseId,
-          set_index: s.set_index,
-          weight: String(s.weight).trim() === "" ? null : Number(s.weight),
-          reps: String(s.reps).trim() === "" ? null : Number(s.reps),
-          is_warmup: false,
-        });
-      }
-    }
-
-    await insertSets(rows);
-
-    // PR detection (best-effort; don’t block save UX)
-    let prMsg = "";
-    try {
-      const prs = await detectPRsForWorkout(userId, activeWorkout.items);
-      if (prs.length) {
-        const lines = prs.map((p) => {
-          const bits = [];
-          if (p.newMaxWeight != null) bits.push(`Max weight PR: ${p.newMaxWeight}`);
-          if (p.newBestE1RM != null) bits.push(`e1RM PR: ${p.newBestE1RM.toFixed(1)}`);
-          return `🏆 ${p.exerciseName} — ${bits.join(" | ")}`;
-        });
-        prMsg = "\n" + lines.join("\n");
-      }
-    } catch (e) {
-      console.warn("PR detection failed (non-blocking):", e);
-    }
-
-    setWorkoutMsg(`Saved ✅${prMsg}`);
-    activeWorkout = null;
-    hide($("saveWorkoutBtn"));
-    renderActiveWorkout();
-    await refreshHistory();
-  } catch (err) {
-    console.error(err);
-    alert(String(err.message || err));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
+  } catch (err) {
+    console.error(err);
+    alert(String(err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });
 
 // --------------------
