@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-16-B");
+console.log("APP VERSION: 2026-02-16-D");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
