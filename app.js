@@ -1773,11 +1773,11 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
     if (!activeWorkout.workoutId) {
       const workout = await createWorkout(userId);
       if (!workout?.id) throw new Error("Failed to create workout.");
-      activeWorkout.workoutId = workout.id;
+      activeWorkout.workoutId = activeWorkout.workoutId;
 
       // create workout_exercises from the current activeWorkout order/grouping
       const body = (activeWorkout.items || []).map((it) => ({
-        workout_id: workout.id,
+        workout_id: activeWorkout.workoutId,
         exercise_id: it.exerciseId,
         order_index: it.order_index ?? 0,
         group_id: it.group_id ?? null,
