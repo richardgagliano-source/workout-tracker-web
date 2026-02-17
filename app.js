@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-L");
+console.log("APP VERSION: 2026-02-17-G");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -23,7 +23,7 @@ let cachedTemplates = [];
 let openProgramIds = new Set();
 let programSearchTerms = new Map(); // template_id -> last search term
 let lastProgramFocusId = null;
-let activeWorkout = null; // { workoutId: null|id, templateId, items: [{ workoutExerciseId: null|id, exerciseId, exerciseName, order_index, group_id, group_order, is_skipped, sets: [...] }] }
+let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
 
 // --- DOM helpers ---
 const $ = (id) => document.getElementById(id);
@@ -1139,7 +1139,7 @@ async function createWorkout(userId, templateId) {
 async function createWorkoutExercises(workoutId, templateItems) {
   const body = templateItems.map((it) => ({
     workout_id: workoutId,
-    exercise_id: it.exercise_id ?? it.exerciseId,   // ✅ allow both shapes
+    exercise_id: it.exercise_id,
     order_index: it.order_index,
     group_id: it.group_id ?? null,
     group_order: it.group_order ?? null,
@@ -1220,9 +1220,7 @@ addSet.textContent = "+ set";
   const items = (activeWorkout.items || []).filter((it) => !it.is_skipped);
   const groups = [];
   const seen = new Set();
-const itemKey = (it) =>
-  it.workoutExerciseId ?? `${it.exerciseId}::${it.order_index ?? 0}`;
-  
+
   // deterministic order by order_index (or fallback)
   const ordered = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
@@ -1230,11 +1228,11 @@ const itemKey = (it) =>
   // DEBUG: show group ids on mobile
 
   for (const it of ordered) {
-    if (seen.has(itemKey(it))) continue;
+    if (seen.has(it.workoutExerciseId)) continue;
 
 const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
       groups.push({ type: "single", items: [it] });
-      seen.add(itemKey(it));
+      seen.add(it.workoutExerciseId);
       continue;
     }
 
@@ -1242,7 +1240,7 @@ const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
   .filter((x) => (x.group_id ?? x.groupId ?? null) === gid)
 .sort((a, b) => ((a.group_order ?? a.groupOrder ?? 0) - (b.group_order ?? b.groupOrder ?? 0)));
 
-    members.forEach((m) => seen.add(itemKey(m)));
+    members.forEach((m) => seen.add(m.workoutExerciseId));
     groups.push({ type: "superset", group_id: gid, items: members.slice(0, 3) });
   }
 
@@ -1381,62 +1379,67 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       lastSetsMap = new Map();
     }
 
+const workout = await createWorkout(userId, templateId);
+    if (!workout?.id) throw new Error("Failed to create workout.");
 
+    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
 
     const nameByExerciseId = new Map((tpl.items || []).map((it) => [it.exercise_id, it.exercise_name]));
 
+    // ✅ Map template item by exercise_id (used to pull group_id/group_order if DB insert doesn't return them)
+    const tplByExerciseId = new Map((tpl.items || []).map((it) => [String(it.exercise_id), it]));
 
     // ✅ Superset grouping from localStorage (fallback)
     const ssMap = loadSupersetMap(templateId);
-// ✅ Session-only start: do NOT create a workout row yet
-activeWorkout = {
-  workoutId: null,         // ✅ not saved until Save
-  templateId,              // ✅ needed so Save can write history correctly
-  items: (tpl.items || [])
-    .slice()
-    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    .map((it) => {
-      const prevSets = lastSetsMap.get(it.exercise_id) || [];
 
-      // ✅ Superset grouping from localStorage (fallback)
-      const ssId = ssMap?.get(String(it.exercise_id)) || null;
+    activeWorkout = {
+      workoutId: workout.id,
+      items: (weInserted || [])
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+        .map((we) => {
+          const prevSets = lastSetsMap.get(we.exercise_id) || [];
+          const tplItem = tplByExerciseId.get(String(we.exercise_id)) || {};
 
-      // ✅ group fields come from template items (this is the important part)
-      const gid = it.group_id ?? ssId ?? null;
-      const gorder = it.group_order ?? null;
+          // ✅ superset id from localStorage
+          const ssId = ssMap?.get(String(we.exercise_id)) || null;
 
-      // ✅ only keep LAST set for autofill
-      let sets;
-      if (!prevSets.length) {
-        sets = [{ set_index: 0, weight: "", reps: "" }];
-      } else {
-        const last = prevSets[prevSets.length - 1];
-        sets = [{
-          set_index: 0,
-          weight: last.weight ?? "",
-          reps: last.reps ?? "",
-        }];
-      }
+          // ✅ derive group id & order (this fixes your "gid not defined" error)
+          const gid = we.group_id ?? tplItem.group_id ?? ssId ?? null;
+          const gorder = we.group_order ?? tplItem.group_order ?? null;
 
-      return {
-        workoutExerciseId: null,     // ✅ not created until Save
-        exerciseId: it.exercise_id,
-        exerciseName: it.exercise_name || nameByExerciseId.get(it.exercise_id) || "Exercise",
-        order_index: it.order_index ?? 0,
+          // ✅ only keep LAST set for autofill
+          let sets;
+          if (!prevSets.length) {
+            sets = [{ set_index: 0, weight: "", reps: "" }];
+          } else {
+            const last = prevSets[prevSets.length - 1];
+            sets = [{
+              set_index: 0,
+              weight: last.weight ?? "",
+              reps: last.reps ?? "",
+            }];
+          }
 
-        group_id: gid,
-        group_order: gorder,
-        original_group: gid,
+          return {
+            workoutExerciseId: we.id,
+            exerciseId: we.exercise_id,
+            exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+            order_index: we.order_index ?? 0,
 
-        is_skipped: false,
+            // ✅ important for grouping into same card
+            group_id: gid,
+            group_order: gorder,
+            original_group: we.original_group ?? gid,
 
-        // optional debugging
-        supersetId: ssId,
+            is_skipped: we.is_skipped ?? false,
 
-        sets,
-      };
-    }),
-};
+            // keep for debugging (optional)
+            supersetId: ssId,
+
+            sets,
+          };
+        }),
+    };
 
     // --- Avoid window collision with DOM id "activeWorkout" by writing to a safe global ---
     window.__workoutState = activeWorkout;
@@ -1897,23 +1900,21 @@ async function refreshHistory() {
       card.className = "item";
       card.style.cursor = "pointer";
 
-    // Format as MM/DD/YY
-const d = new Date(w.performed_at);
-const mm = String(d.getMonth() + 1).padStart(2, "0");
-const dd = String(d.getDate()).padStart(2, "0");
-const yy = String(d.getFullYear()).slice(-2);
-const dateShort = `${mm}/${dd}/${yy}`;
+      // format date as "Mar 7, 2026"
+      const dateOnly = new Date(w.performed_at).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
 
-const programName = w.template_name || "Workout";
-const exCount = w.exercise_count ?? 0;
+      const programName = w.template_name || "Workout";
+      const exCount = w.exercise_count ?? 0;
 
-card.innerHTML = `
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h3 style="margin:0;">${escapeHtml(programName)}</h3>
-    <div class="small muted">${escapeHtml(dateShort)}</div>
-  </div>
-  <div class="small">${exCount} exercises</div>
-`;
+      card.innerHTML = `
+        <h3>${escapeHtml(programName)}</h3>
+        <div class="small muted">${escapeHtml(dateOnly)}</div>
+        <div class="small">${exCount} exercises</div>
+      `;
 
       card.addEventListener("click", () => showWorkoutDetail(w.id));
       host.appendChild(card);
@@ -1955,14 +1956,11 @@ async function loadWorkoutDetail(workoutId) {
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
     .map((we) => ({
       ...we,
-      sets: (we.sets || [])
-        .slice()
-        .sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0)),
+      sets: (we.sets || []).slice().sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0)),
     }));
 
   return { ...data, workout_exercises: wes };
 }
-
 async function deleteWorkoutCascade(workoutId) {
   // 1) load workout_exercise ids
   const weParams = new URLSearchParams();
@@ -2005,35 +2003,8 @@ async function showWorkoutDetail(workoutId) {
   header.style.justifyContent = "space-between";
   header.style.alignItems = "center";
 
-  // ✅ Template name at top (not "program name")
-  const tplName = w.workout_templates?.name || "Workout";
-
-  // ✅ Date/time without seconds
-  const performed = new Date(w.performed_at);
-  const dateStr = performed.toLocaleDateString(undefined, {
-    month: "2-digit",
-    day: "2-digit",
-    year: "2-digit",
-  });
-  const timeStr = performed.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-  // Left side: template name + date/time
-  const left = document.createElement("div");
-  left.style.display = "flex";
-  left.style.flexDirection = "column";
-  left.style.gap = "4px";
-
   const title = document.createElement("h3");
-  title.textContent = tplName;
-
-  const sub = document.createElement("div");
-  sub.className = "small muted";
-  sub.textContent = `${dateStr} • ${timeStr}`;
-
-  left.append(title, sub);
+  title.textContent = new Date(w.performed_at).toLocaleString();
 
   const back = document.createElement("button");
   back.className = "secondary";
@@ -2044,34 +2015,33 @@ async function showWorkoutDetail(workoutId) {
     detail.innerHTML = "";
   };
 
-  const actions = document.createElement("div");
-  actions.className = "row";
-  actions.style.gap = "8px";
+const actions = document.createElement("div");
+actions.className = "row";
+actions.style.gap = "8px";
 
-  const del = document.createElement("button");
-  del.className = "secondary";
-  del.textContent = "Delete workout";
-  del.onclick = async () => {
-    const ok = confirm("Delete this workout from history? This cannot be undone.");
-    if (!ok) return;
+const del = document.createElement("button");
+del.className = "secondary";
+del.textContent = "Delete workout";
+del.onclick = async () => {
+  const ok = confirm("Delete this workout from history? This cannot be undone.");
+  if (!ok) return;
 
-    try {
-      await deleteWorkoutCascade(workoutId);
+  try {
+    await deleteWorkoutCascade(workoutId);
 
-      detail.classList.add("hidden");
-      list.classList.remove("hidden");
-      detail.innerHTML = "";
+    detail.classList.add("hidden");
+    list.classList.remove("hidden");
+    detail.innerHTML = "";
 
-      await refreshHistory();
-    } catch (e) {
-      console.error(e);
-      alert(`Failed to delete workout: ${String(e.message || e)}`);
-    }
-  };
+    await refreshHistory();
+  } catch (e) {
+    console.error(e);
+    alert(`Failed to delete workout: ${String(e.message || e)}`);
+  }
+};
 
-  actions.append(del, back);
-
-  header.append(left, actions);
+actions.append(del, back);
+header.append(title, actions);
   wrap.appendChild(header);
 
   (w.workout_exercises || []).forEach((we, i) => {
@@ -2084,11 +2054,7 @@ async function showWorkoutDetail(workoutId) {
     ex.innerHTML = `
       <div><b>${i + 1}. ${name}</b></div>
       <div class="small">
-        ${
-          sets.length
-            ? sets.map((s, idx) => `Set ${idx + 1}: ${fmtSet(s)}`).join("<br/>")
-            : "No sets saved"
-        }
+        ${sets.length ? sets.map((s, idx) => `Set ${idx + 1}: ${fmtSet(s)}`).join("<br/>") : "No sets saved"}
       </div>
     `;
 
