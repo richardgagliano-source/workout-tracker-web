@@ -600,3 +600,55 @@ body.app-loading #appSection {
     min-width: 220px;
   }
 }
+/* --- Superset overlap fix (newer iPhones / larger font sizes) --- */
+
+/* Make sure widths include padding/borders */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Grid cells MUST be allowed to shrink, or content will overflow into neighbors */
+.superset-grid,
+.superset-col { min-width: 0; }
+
+/* Prevent titles/headers from overflowing into the next column */
+.superset-col h3,
+.superset-col .superset-title,
+.superset-col .exercise-title,
+.superset-col .row > div:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* If you prefer wrapping instead of ellipsis, swap the 3 lines above for:
+   white-space: normal;
+   overflow-wrap: anywhere;
+   word-break: break-word;
+*/
+
+/* Inputs must respect the column width */
+.superset-col input {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Rows inside columns should be allowed to wrap */
+.superset-col .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Buttons shouldn’t force overflow */
+.superset-col button {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+/* On narrow screens, tighten padding so the grid has room */
+@media (max-width: 430px) {
+  .superset-grid { gap: 10px; }
+  .superset-col input { padding: 10px 12px; }
+  .superset-col button { padding: 10px 12px; font-size: 14px; }
+}
