@@ -1375,7 +1375,7 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       lastSetsMap = new Map();
     }
 
-    const workout = await createWorkout(userId, templateId);
+const workout = await createWorkout(userId, templateId, tpl.name);
     if (!workout?.id) throw new Error("Failed to create workout.");
 
     const weInserted = await createWorkoutExercises(workout.id, tpl.items);
