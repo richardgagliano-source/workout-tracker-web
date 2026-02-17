@@ -620,11 +620,6 @@ body.app-loading #appSection {
   white-space: nowrap;
 }
 
-/* If you prefer wrapping instead of ellipsis, swap the 3 lines above for:
-   white-space: normal;
-   overflow-wrap: anywhere;
-   word-break: break-word;
-*/
 
 /* Inputs must respect the column width */
 .superset-col input {
