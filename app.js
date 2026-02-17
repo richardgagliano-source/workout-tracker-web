@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-J");
+console.log("APP VERSION: 2026-02-17-k");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -23,7 +23,7 @@ let cachedTemplates = [];
 let openProgramIds = new Set();
 let programSearchTerms = new Map(); // template_id -> last search term
 let lastProgramFocusId = null;
-let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseId, exerciseName, sets: [{set_index, weight, reps}] }] }
+let activeWorkout = null; // { workoutId: null|id, templateId, items: [{ workoutExerciseId: null|id, exerciseId, exerciseName, order_index, group_id, group_order, is_skipped, sets: [...] }] }
 
 // --- DOM helpers ---
 const $ = (id) => document.getElementById(id);
@@ -1139,7 +1139,7 @@ async function createWorkout(userId, templateId) {
 async function createWorkoutExercises(workoutId, templateItems) {
   const body = templateItems.map((it) => ({
     workout_id: workoutId,
-    exercise_id: it.exercise_id,
+    exercise_id: it.exercise_id ?? it.exerciseId,   // ✅ allow both shapes
     order_index: it.order_index,
     group_id: it.group_id ?? null,
     group_order: it.group_order ?? null,
@@ -1379,67 +1379,62 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       lastSetsMap = new Map();
     }
 
-const workout = await createWorkout(userId, templateId);
-    if (!workout?.id) throw new Error("Failed to create workout.");
 
-    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
 
     const nameByExerciseId = new Map((tpl.items || []).map((it) => [it.exercise_id, it.exercise_name]));
 
-    // ✅ Map template item by exercise_id (used to pull group_id/group_order if DB insert doesn't return them)
-    const tplByExerciseId = new Map((tpl.items || []).map((it) => [String(it.exercise_id), it]));
 
     // ✅ Superset grouping from localStorage (fallback)
     const ssMap = loadSupersetMap(templateId);
+// ✅ Session-only start: do NOT create a workout row yet
+activeWorkout = {
+  workoutId: null,         // ✅ not saved until Save
+  templateId,              // ✅ needed so Save can write history correctly
+  items: (tpl.items || [])
+    .slice()
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((it) => {
+      const prevSets = lastSetsMap.get(it.exercise_id) || [];
 
-    activeWorkout = {
-      workoutId: workout.id,
-      items: (weInserted || [])
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-        .map((we) => {
-          const prevSets = lastSetsMap.get(we.exercise_id) || [];
-          const tplItem = tplByExerciseId.get(String(we.exercise_id)) || {};
+      // ✅ Superset grouping from localStorage (fallback)
+      const ssId = ssMap?.get(String(it.exercise_id)) || null;
 
-          // ✅ superset id from localStorage
-          const ssId = ssMap?.get(String(we.exercise_id)) || null;
+      // ✅ group fields come from template items (this is the important part)
+      const gid = it.group_id ?? ssId ?? null;
+      const gorder = it.group_order ?? null;
 
-          // ✅ derive group id & order (this fixes your "gid not defined" error)
-          const gid = we.group_id ?? tplItem.group_id ?? ssId ?? null;
-          const gorder = we.group_order ?? tplItem.group_order ?? null;
+      // ✅ only keep LAST set for autofill
+      let sets;
+      if (!prevSets.length) {
+        sets = [{ set_index: 0, weight: "", reps: "" }];
+      } else {
+        const last = prevSets[prevSets.length - 1];
+        sets = [{
+          set_index: 0,
+          weight: last.weight ?? "",
+          reps: last.reps ?? "",
+        }];
+      }
 
-          // ✅ only keep LAST set for autofill
-          let sets;
-          if (!prevSets.length) {
-            sets = [{ set_index: 0, weight: "", reps: "" }];
-          } else {
-            const last = prevSets[prevSets.length - 1];
-            sets = [{
-              set_index: 0,
-              weight: last.weight ?? "",
-              reps: last.reps ?? "",
-            }];
-          }
+      return {
+        workoutExerciseId: null,     // ✅ not created until Save
+        exerciseId: it.exercise_id,
+        exerciseName: it.exercise_name || nameByExerciseId.get(it.exercise_id) || "Exercise",
+        order_index: it.order_index ?? 0,
 
-          return {
-            workoutExerciseId: we.id,
-            exerciseId: we.exercise_id,
-            exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
-            order_index: we.order_index ?? 0,
+        group_id: gid,
+        group_order: gorder,
+        original_group: gid,
 
-            // ✅ important for grouping into same card
-            group_id: gid,
-            group_order: gorder,
-            original_group: we.original_group ?? gid,
+        is_skipped: false,
 
-            is_skipped: we.is_skipped ?? false,
+        // optional debugging
+        supersetId: ssId,
 
-            // keep for debugging (optional)
-            supersetId: ssId,
-
-            sets,
-          };
-        }),
-    };
+        sets,
+      };
+    }),
+};
 
     // --- Avoid window collision with DOM id "activeWorkout" by writing to a safe global ---
     window.__workoutState = activeWorkout;
