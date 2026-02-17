@@ -1121,6 +1121,18 @@ async function createWorkout(userId) {
   return created?.[0];
 }
 
+async function createWorkout(userId, templateId) {
+  const body = [{
+    user_id: userId,
+    performed_at: new Date().toISOString(),
+    notes: null,
+    template_id: templateId ?? null, // ✅ NEW
+  }];
+
+  const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
+  return created?.[0];
+}
+
 async function createWorkoutExercises(workoutId, templateItems) {
   const body = templateItems.map((it) => ({
     workout_id: workoutId,
@@ -1815,33 +1827,46 @@ function historyFilterToQuery(filterValue) {
 }
 
 async function loadHistory(userId, filterValue) {
-  const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
+  const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
 
-  const params = new URLSearchParams();
-  params.set("select", "id,performed_at,notes");
-  params.set("user_id", `eq.${userId}`);
-  params.set("order", "performed_at.desc");
-  params.set("limit", String(limit));
+  const params = new URLSearchParams();
 
-  if (performedAfterISO) {
-    params.set("performed_at", `gte.${performedAfterISO}`);
-  }
+  // ✅ Step 3: fetch template_id + joined program name
+  // Requires workouts.template_id column and an FK (or relationship) to workout_templates
+  params.set("select", "id,performed_at,notes,template_id,workout_templates(name)");
 
-  const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
-  if (!workouts.length) return [];
+  params.set("user_id", `eq.${userId}`);
+  params.set("order", "performed_at.desc");
+  params.set("limit", String(limit));
 
-  const ids = workouts.map((w) => w.id).join(",");
+  if (performedAfterISO) {
+    params.set("performed_at", `gte.${performedAfterISO}`);
+  }
 
-  const weParams = new URLSearchParams();
-  weParams.set("select", "workout_id");
-  weParams.set("workout_id", `in.(${ids})`);
+  const workouts =
+    (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
+  if (!workouts.length) return [];
 
-  const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
+  const ids = workouts.map((w) => w.id).join(",");
 
-  const counts = new Map();
-  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
+  const weParams = new URLSearchParams();
+  weParams.set("select", "workout_id");
+  weParams.set("workout_id", `in.(${ids})`);
 
-  return workouts.map((w) => ({ ...w, exercise_count: counts.get(w.id) || 0 }));
+  const wes =
+    (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
+
+  const counts = new Map();
+  wes.forEach((r) =>
+    counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1)
+  );
+
+  // ✅ Keep existing shape but include a convenient template_name fallback
+  return workouts.map((w) => ({
+    ...w,
+    template_name: w.workout_templates?.name || null,
+    exercise_count: counts.get(w.id) || 0,
+  }));
 }
 
 async function refreshHistory() {
