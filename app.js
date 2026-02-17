@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-D");
+console.log("APP VERSION: 2026-02-17-E");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1825,9 +1825,9 @@ function historyFilterToQuery(filterValue) {
 async function loadHistory(userId, filterValue) {
   const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
 
-  // 1) Load workouts (include template_id + program_name)
   const params = new URLSearchParams();
-  params.set("select", "id,performed_at,notes,template_id,program_name");
+  // include the related template name via the relationship
+  params.set("select", "id,performed_at,notes,template_id,workout_templates(name)");
   params.set("user_id", `eq.${userId}`);
   params.set("order", "performed_at.desc");
   params.set("limit", String(limit));
@@ -1839,7 +1839,7 @@ async function loadHistory(userId, filterValue) {
   const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
   if (!workouts.length) return [];
 
-  // 2) Count exercises per workout
+  // collect ids and fetch counts (same as before)
   const ids = workouts.map((w) => w.id).join(",");
 
   const weParams = new URLSearchParams();
@@ -1847,89 +1847,75 @@ async function loadHistory(userId, filterValue) {
   weParams.set("workout_id", `in.(${ids})`);
 
   const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
+
   const counts = new Map();
   wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
 
-  // 3) Load template names by template_id (fallback if program_name is missing)
-  const tplIds = [...new Set(workouts.map((w) => w.template_id).filter(Boolean))];
-  let tplNameById = new Map();
-
-  if (tplIds.length) {
-    const tplParams = new URLSearchParams();
-    tplParams.set("select", "id,name");
-    tplParams.set("id", `in.(${tplIds.join(",")})`);
-
-    const tpls = (await fetchJSON(`/rest/v1/workout_templates?${tplParams.toString()}`)) || [];
-    tplNameById = new Map(tpls.map((t) => [t.id, t.name]));
-  }
-
-  return workouts.map((w) => {
-    const fallbackName = w.template_id ? (tplNameById.get(w.template_id) || "(Unknown program)") : "(No program)";
-    return {
-      ...w,
-      exercise_count: counts.get(w.id) || 0,
-      // prefer saved program_name; fallback to template name
-      program_name: (w.program_name && String(w.program_name).trim()) ? w.program_name : fallbackName,
-    };
-  });
+  // attach exercise_count and template_name for each workout
+  return workouts.map((w) => ({
+    ...w,
+    exercise_count: counts.get(w.id) || 0,
+    // PostgREST returns the related resource as an object named after the relation
+    template_name: (w.workout_templates && w.workout_templates.name) || null,
+  }));
 }
 
 async function refreshHistory() {
-  const host = $("historyList");
-  const detail = $("historyDetail");
+  const host = $("historyList");
+  const detail = $("historyDetail");
 
-  detail.classList.add("hidden");
-  detail.innerHTML = "";
-  host.classList.remove("hidden");
+  detail.classList.add("hidden");
+  detail.innerHTML = "";
+  host.classList.remove("hidden");
 
-  host.innerHTML = "Loading...";
+  host.innerHTML = "Loading...";
 
-  let userId;
-  try {
-    userId = getUserIdOrThrow();
-  } catch {
-    host.innerHTML = '<div class="muted">Not signed in.</div>';
-    return;
-  }
+  let userId;
+  try {
+    userId = getUserIdOrThrow();
+  } catch {
+    host.innerHTML = '<div class="muted">Not signed in.</div>';
+    return;
+  }
 
-  try {
-const filterValue = $("historyFilter")?.value || "20"; // whatever you set as default
-const rows = await loadHistory(userId, filterValue);
-    host.innerHTML = "";
+  try {
+    const filterValue = $("historyFilter")?.value || "20";
+    const rows = await loadHistory(userId, filterValue);
+    host.innerHTML = "";
 
-    if (!rows.length) {
-      host.innerHTML = '<div class="muted">No workouts yet. Start one in the Workout tab.</div>';
-      return;
-    }
+    if (!rows.length) {
+      host.innerHTML = '<div class="muted">No workouts yet. Start one in the Workout tab.</div>';
+      return;
+    }
 
-    rows.forEach((w) => {
-      const card = document.createElement("div");
-      card.className = "item";
-      card.style.cursor = "pointer";
+    rows.forEach((w) => {
+      const card = document.createElement("div");
+      card.className = "item";
+      card.style.cursor = "pointer";
 
-      const dateOnly = new Date(w.performed_at).toLocaleDateString(undefined, {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-});
+      // format date as "Mar 7, 2026"
+      const dateOnly = new Date(w.performed_at).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
 
-const programName = w.program_name ||  "Workout";
+      const programName = w.template_name || "Workout";
+      const exCount = w.exercise_count ?? 0;
 
-const exCount = w.exercise_count ?? 0;
+      card.innerHTML = `
+        <h3>${escapeHtml(programName)}</h3>
+        <div class="small muted">${escapeHtml(dateOnly)}</div>
+        <div class="small">${exCount} exercises</div>
+      `;
 
-card.innerHTML = `
-  <h3>${programName}</h3>
-  <div class="small muted">${dateOnly}</div>
-  <div class="small">${exCount} exercises</div>
-`;
-      card.addEventListener("click", () => showWorkoutDetail(w.id));
-
-      host.appendChild(card);
-    });
-  } catch (err) {
-    console.error(err);
-    host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
-  }
+      card.addEventListener("click", () => showWorkoutDetail(w.id));
+      host.appendChild(card);
+    });
+  } catch (err) {
+    console.error(err);
+    host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
+  }
 }
 
 function fmtSet(s) {
