@@ -1405,16 +1405,12 @@ $("startWorkoutBtn").addEventListener("click", async () => {
     exerciseId: we.exercise_id,
     exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
     order_index: we.order_index ?? 0,
-
-    // ✅ IMPORTANT: fall back to ssId so supersets can render as one card
-    group_id: we.group_id ?? ssId,
-    group_order: we.group_order ?? null,
-    original_group: we.original_group ?? we.group_id ?? ssId,
+      group_id: gid,
+  group_order: gorder,
+  original_group: we.original_group ?? gid,
 
     is_skipped: we.is_skipped ?? false,
 
-    // you can keep or delete this, but it won’t be needed after the change above
-    supersetId: ssId,
 
    sets: (() => {
   if (!prevSets || !prevSets.length) {
