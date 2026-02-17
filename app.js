@@ -1877,10 +1877,25 @@ const rows = await loadHistory(userId, filterValue);
       card.className = "item";
       card.style.cursor = "pointer";
 
-      const dt = new Date(w.performed_at).toLocaleString();
-      const exCount = w.exercise_count ?? 0;
+      const dateOnly = new Date(w.performed_at).toLocaleDateString(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
 
-      card.innerHTML = `<h3>${dt}</h3><div class="small">${exCount} exercises</div>`;
+const programName =
+  w.workout_templates?.name ||
+  w.template_name ||
+  w.program_name ||
+  "Workout";
+
+const exCount = w.exercise_count ?? 0;
+
+card.innerHTML = `
+  <h3>${programName}</h3>
+  <div class="small muted">${dateOnly}</div>
+  <div class="small">${exCount} exercises</div>
+`;
       card.addEventListener("click", () => showWorkoutDetail(w.id));
 
       host.appendChild(card);
