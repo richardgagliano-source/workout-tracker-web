@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-E");
+console.log("APP VERSION: 2026-02-17-F");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -29,6 +29,14 @@ let activeWorkout = null; // { workoutId, items: [{ workoutExerciseId, exerciseI
 const $ = (id) => document.getElementById(id);
 const show = (el) => el.classList.remove("hidden");
 const hide = (el) => el.classList.add("hidden");
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 function setAuthMsg(msg) { $("authMsg").textContent = msg || ""; }
 function setWorkoutMsg(msg) { $("workoutMsg").textContent = msg || ""; }
 
