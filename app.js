@@ -1335,7 +1335,6 @@ const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
     host.appendChild(card);
   }
 }
-
 // Start workout (autofill last set if available)
 $("startWorkoutBtn").addEventListener("click", async () => {
   const btn = $("startWorkoutBtn");
@@ -1413,7 +1412,7 @@ activeWorkout = {
 window.__workoutState = activeWorkout;
 window.__workoutStateLastUpdated = Date.now();
     activeWorkout = {
-      workoutId: activeWorkout.workoutid,
+      workoutId: workout.id,
       items: (weInserted || [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         .map((we) => {
@@ -1773,11 +1772,11 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
     if (!activeWorkout.workoutId) {
       const workout = await createWorkout(userId);
       if (!workout?.id) throw new Error("Failed to create workout.");
-      activeWorkout.workoutId = activeWorkout.workoutId;
+      activeWorkout.workoutId = workout.id;
 
       // create workout_exercises from the current activeWorkout order/grouping
       const body = (activeWorkout.items || []).map((it) => ({
-        workout_id: activeWorkout.workoutId,
+        workout_id: workout.id,
         exercise_id: it.exerciseId,
         order_index: it.order_index ?? 0,
         group_id: it.group_id ?? null,
