@@ -1364,11 +1364,6 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       lastSetsMap = new Map();
     }
 
-    const workout = await createWorkout(userId);
-    if (!workout?.id) throw new Error("Failed to create workout.");
-
-    const weInserted = await createWorkoutExercises(workout.id, tpl.items);
-
     const nameByExerciseId = new Map((tpl.items || []).map((it) => [it.exercise_id, it.exercise_name]));
 
     // ✅ Map template item by exercise_id (used to pull group_id/group_order if DB insert doesn't return them)
@@ -1376,7 +1371,46 @@ $("startWorkoutBtn").addEventListener("click", async () => {
 
     // ✅ Superset grouping from localStorage (fallback)
     const ssMap = loadSupersetMap(templateId);
+// ✅ Start workout locally ONLY (do not create workout in Supabase yet)
+activeWorkout = {
+  workoutId: null,         // not created until Save
+  templateId,
+  items: (tpl.items || [])
+    .slice()
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((it) => {
+      const prevSets = lastSetsMap.get(it.exercise_id) || [];
+      const last = prevSets.length ? prevSets[prevSets.length - 1] : null;
 
+      // superset id from localStorage (fallback grouping)
+      const ssId = ssMap.get(String(it.exercise_id)) || null;
+
+      return {
+        workoutExerciseId: null, // not created until Save
+        exerciseId: it.exercise_id,
+        exerciseName: it.exercise_name || "Exercise",
+        order_index: it.order_index ?? 0,
+
+        // grouping (prefer template group_id, fallback to local ssId)
+        group_id: it.group_id ?? ssId ?? null,
+        group_order: it.group_order ?? null,
+        original_group: it.group_id ?? ssId ?? null,
+
+        is_skipped: false,
+
+        // ✅ only ONE autofill row (the last set)
+        sets: [{
+          set_index: 0,
+          weight: last?.weight ?? "",
+          reps: last?.reps ?? "",
+        }],
+      };
+    }),
+};
+
+// keep your debug global if you want
+window.__workoutState = activeWorkout;
+window.__workoutStateLastUpdated = Date.now();
     activeWorkout = {
       workoutId: workout.id,
       items: (weInserted || [])
@@ -1733,7 +1767,36 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
 
   try {
     const userId = getUserIdOrThrow();
+// ✅ If we haven't created the workout in Supabase yet, do it now (only on Save)
+if (!activeWorkout.workoutId) {
+  const workout = await createWorkout(userId);
+  if (!workout?.id) throw new Error("Failed to create workout.");
+  activeWorkout.workoutId = workout.id;
 
+  // create workout_exercises from the current activeWorkout order/grouping
+  const body = (activeWorkout.items || []).map((it) => ({
+    workout_id: workout.id,
+    exercise_id: it.exerciseId,
+    order_index: it.order_index ?? 0,
+    group_id: it.group_id ?? null,
+    group_order: it.group_order ?? null,
+    original_group: it.original_group ?? (it.group_id ?? null),
+    is_skipped: !!it.is_skipped,
+  }));
+
+  const created = await fetchJSON(`/rest/v1/workout_exercises`, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body,
+  });
+
+  // map created rows back onto activeWorkout items so sets can reference workout_exercise_id
+  const byExerciseId = new Map((created || []).map((we) => [String(we.exercise_id), we]));
+  (activeWorkout.items || []).forEach((it) => {
+    const we = byExerciseId.get(String(it.exerciseId));
+    if (we) it.workoutExerciseId = we.id;
+  });
+}
     const rows = [];
     for (const item of activeWorkout.items) {
       if (item.isSkipped) continue;
