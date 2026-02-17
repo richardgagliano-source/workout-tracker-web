@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-16-H");
+console.log("APP VERSION: 2026-02-17-A");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1824,12 +1824,9 @@ function historyFilterToQuery(filterValue) {
 async function loadHistory(userId, filterValue) {
   const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
 
+  // 1) Load workouts (include template_id)
   const params = new URLSearchParams();
-
-  // ✅ Step 3: fetch template_id + joined program name
-  // Requires workouts.template_id column and an FK (or relationship) to workout_templates
-  params.set("select", "id,performed_at,notes,template_id,workout_templates(name)");
-
+  params.set("select", "id,performed_at,notes,template_id");
   params.set("user_id", `eq.${userId}`);
   params.set("order", "performed_at.desc");
   params.set("limit", String(limit));
@@ -1838,29 +1835,36 @@ async function loadHistory(userId, filterValue) {
     params.set("performed_at", `gte.${performedAfterISO}`);
   }
 
-  const workouts =
-    (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
+  const workouts = (await fetchJSON(`/rest/v1/workouts?${params.toString()}`)) || [];
   if (!workouts.length) return [];
 
+  // 2) Count exercises per workout
   const ids = workouts.map((w) => w.id).join(",");
-
   const weParams = new URLSearchParams();
   weParams.set("select", "workout_id");
   weParams.set("workout_id", `in.(${ids})`);
 
-  const wes =
-    (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
-
+  const wes = (await fetchJSON(`/rest/v1/workout_exercises?${weParams.toString()}`)) || [];
   const counts = new Map();
-  wes.forEach((r) =>
-    counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1)
-  );
+  wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
 
-  // ✅ Keep existing shape but include a convenient template_name fallback
+  // 3) Load template names (program names) by template_id
+  const tplIds = [...new Set(workouts.map(w => w.template_id).filter(Boolean))];
+  let tplNameById = new Map();
+
+  if (tplIds.length) {
+    const tplParams = new URLSearchParams();
+    tplParams.set("select", "id,name");
+    tplParams.set("id", `in.(${tplIds.join(",")})`);
+
+    const tpls = (await fetchJSON(`/rest/v1/workout_templates?${tplParams.toString()}`)) || [];
+    tplNameById = new Map(tpls.map(t => [t.id, t.name]));
+  }
+
   return workouts.map((w) => ({
     ...w,
-    template_name: w.workout_templates?.name || null,
     exercise_count: counts.get(w.id) || 0,
+    program_name: w.template_id ? (tplNameById.get(w.template_id) || "(Unknown program)") : "(No program)",
   }));
 }
 
@@ -1903,11 +1907,7 @@ const rows = await loadHistory(userId, filterValue);
   day: "numeric",
 });
 
-const programName =
-  w.workout_templates?.name ||
-  w.template_name ||
-  w.program_name ||
-  "Workout";
+const programName = w.workout_templates?.name ||  "Workout";
 
 const exCount = w.exercise_count ?? 0;
 
