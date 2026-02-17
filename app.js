@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-k");
+console.log("APP VERSION: 2026-02-17-L");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1220,7 +1220,9 @@ addSet.textContent = "+ set";
   const items = (activeWorkout.items || []).filter((it) => !it.is_skipped);
   const groups = [];
   const seen = new Set();
-
+const itemKey = (it) =>
+  it.workoutExerciseId ?? `${it.exerciseId}::${it.order_index ?? 0}`;
+  
   // deterministic order by order_index (or fallback)
   const ordered = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
@@ -1228,11 +1230,11 @@ addSet.textContent = "+ set";
   // DEBUG: show group ids on mobile
 
   for (const it of ordered) {
-    if (seen.has(it.workoutExerciseId)) continue;
+    if (seen.has(itemKey(it))) continue;
 
 const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
       groups.push({ type: "single", items: [it] });
-      seen.add(it.workoutExerciseId);
+      seen.add(itemKey(it));
       continue;
     }
 
@@ -1240,7 +1242,7 @@ const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
   .filter((x) => (x.group_id ?? x.groupId ?? null) === gid)
 .sort((a, b) => ((a.group_order ?? a.groupOrder ?? 0) - (b.group_order ?? b.groupOrder ?? 0)));
 
-    members.forEach((m) => seen.add(m.workoutExerciseId));
+    members.forEach((m) => seen.add(itemKey(m)));
     groups.push({ type: "superset", group_id: gid, items: members.slice(0, 3) });
   }
 
