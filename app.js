@@ -1348,16 +1348,14 @@ const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
     host.appendChild(card);
   }
 }
-// Start workout (autofill last sets if available)
+// Start workout (autofill last set if available)
 $("startWorkoutBtn").addEventListener("click", async () => {
-
   const btn = $("startWorkoutBtn");
   btn.disabled = true;
   const originalText = btn.textContent;
   btn.textContent = "Loading...";
 
   try {
-
     setWorkoutMsg("");
 
     const templateId = $("startTplSelect").value;
@@ -1365,13 +1363,12 @@ $("startWorkoutBtn").addEventListener("click", async () => {
 
     const tpl = (cachedTemplates || []).find((t) => t.id === templateId);
     if (!tpl) throw new Error("Template not found. Go to Templates tab and refresh.");
-    if (!tpl.items || tpl.items.length === 0)
-      throw new Error("This template has no exercises yet.");
+    if (!tpl.items || tpl.items.length === 0) throw new Error("This template has no exercises yet.");
 
     const userId = getUserIdOrThrow();
 
     // AUTOFILL attempt (non-blocking)
-    const exerciseIds = tpl.items.map((it) => it.exercise_id).filter(Boolean);
+    const exerciseIds = (tpl.items || []).map((it) => it.exercise_id).filter(Boolean);
     let lastSetsMap = new Map();
     try {
       lastSetsMap = await loadLastSetsByExercise(userId, exerciseIds);
@@ -1384,10 +1381,13 @@ $("startWorkoutBtn").addEventListener("click", async () => {
     if (!workout?.id) throw new Error("Failed to create workout.");
 
     const weInserted = await createWorkoutExercises(workout.id, tpl.items);
-    const nameByExerciseId = new Map(
-      tpl.items.map((it) => [it.exercise_id, it.exercise_name])
-    );
 
+    const nameByExerciseId = new Map((tpl.items || []).map((it) => [it.exercise_id, it.exercise_name]));
+
+    // ✅ Map template item by exercise_id (used to pull group_id/group_order if DB insert doesn't return them)
+    const tplByExerciseId = new Map((tpl.items || []).map((it) => [String(it.exercise_id), it]));
+
+    // ✅ Superset grouping from localStorage (fallback)
     const ssMap = loadSupersetMap(templateId);
 
     activeWorkout = {
@@ -1395,42 +1395,51 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       items: (weInserted || [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         .map((we) => {
-  const prevSets = lastSetsMap.get(we.exercise_id);
+          const prevSets = lastSetsMap.get(we.exercise_id) || [];
+          const tplItem = tplByExerciseId.get(String(we.exercise_id)) || {};
 
-  // ✅ superset id from localStorage
-  const ssId = ssMap.get(String(we.exercise_id)) || null;
+          // ✅ superset id from localStorage
+          const ssId = ssMap?.get(String(we.exercise_id)) || null;
 
-  return {
-    workoutExerciseId: we.id,
-    exerciseId: we.exercise_id,
-    exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
-    order_index: we.order_index ?? 0,
-      group_id: gid,
-  group_order: gorder,
-  original_group: we.original_group ?? gid,
+          // ✅ derive group id & order (this fixes your "gid not defined" error)
+          const gid = we.group_id ?? tplItem.group_id ?? ssId ?? null;
+          const gorder = we.group_order ?? tplItem.group_order ?? null;
 
-    is_skipped: we.is_skipped ?? false,
+          // ✅ only keep LAST set for autofill
+          let sets;
+          if (!prevSets.length) {
+            sets = [{ set_index: 0, weight: "", reps: "" }];
+          } else {
+            const last = prevSets[prevSets.length - 1];
+            sets = [{
+              set_index: 0,
+              weight: last.weight ?? "",
+              reps: last.reps ?? "",
+            }];
+          }
 
+          return {
+            workoutExerciseId: we.id,
+            exerciseId: we.exercise_id,
+            exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+            order_index: we.order_index ?? 0,
 
-   sets: (() => {
-  if (!prevSets || !prevSets.length) {
-    return [{ set_index: 0, weight: "", reps: "" }];
-  }
+            // ✅ important for grouping into same card
+            group_id: gid,
+            group_order: gorder,
+            original_group: we.original_group ?? gid,
 
-  const last = prevSets[prevSets.length - 1];
+            is_skipped: we.is_skipped ?? false,
 
-  return [{
-    set_index: 0,
-    weight: last.weight ?? "",
-    reps: last.reps ?? "",
-  }];
-})(),
-  };
-})
+            // keep for debugging (optional)
+            supersetId: ssId,
+
+            sets,
+          };
+        }),
     };
 
     // --- Avoid window collision with DOM id "activeWorkout" by writing to a safe global ---
-    // Keep a direct reference plus a timestamp so you can inspect in console:
     window.__workoutState = activeWorkout;
     window.__workoutStateLastUpdated = Date.now();
     // -------------------------------------------------------------------------------
@@ -1438,7 +1447,6 @@ $("startWorkoutBtn").addEventListener("click", async () => {
     renderActiveWorkout();
     show($("saveWorkoutBtn"));
     setWorkoutMsg("Workout started. Autofilled last weights/reps (if available).");
-
   } catch (err) {
     console.error(err);
     alert(String(err.message || err));
@@ -1446,7 +1454,6 @@ $("startWorkoutBtn").addEventListener("click", async () => {
     btn.disabled = false;
     btn.textContent = originalText;
   }
-
 });
 // --------------------
 // Progress + PR detection (NEW)
