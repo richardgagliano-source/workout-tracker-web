@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-I");
+console.log("APP VERSION: 2026-02-17-G");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1900,26 +1900,21 @@ async function refreshHistory() {
       card.className = "item";
       card.style.cursor = "pointer";
 
-      // format date as "mm/dd/yy"
-      const d = new Date(w.performed_at);
-const mm = String(d.getMonth() + 1).padStart(2, "0");
-const dd = String(d.getDate()).padStart(2, "0");
-const yy = String(d.getFullYear()).slice(-2);
-const dateShort = `${mm}/${dd}/${yy}`;
+      // format date as "Mar 7, 2026"
+      const dateOnly = new Date(w.performed_at).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
 
-const titleText =
-  w.workout_templates?.name ||
-  w.template_name ||
-  w.program_name || // harmless fallback if it exists anywhere
-  "Workout";
+      const programName = w.template_name || "Workout";
+      const exCount = w.exercise_count ?? 0;
 
-card.innerHTML = `
-  <div class="row" style="justify-content:space-between; align-items:baseline; gap:12px;">
-    <h3 style="margin:0;">${titleText}</h3>
-    <div class="small muted" style="white-space:nowrap;">${dateShort}</div>
-  </div>
-  <div class="small">${exCount} exercises</div>
-`;
+      card.innerHTML = `
+        <h3>${escapeHtml(programName)}</h3>
+        <div class="small muted">${escapeHtml(dateOnly)}</div>
+        <div class="small">${exCount} exercises</div>
+      `;
 
       card.addEventListener("click", () => showWorkoutDetail(w.id));
       host.appendChild(card);
