@@ -1904,6 +1904,7 @@ async function loadWorkoutDetail(workoutId) {
       id,
       performed_at,
       notes,
+      workout_templates ( name ),
       workout_exercises (
         id,
         order_index,
