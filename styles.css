@@ -647,3 +647,32 @@ body.app-loading #appSection {
   .superset-col input { padding: 10px 12px; }
   .superset-col button { padding: 10px 12px; font-size: 14px; }
 }
+/* --- Set buttons styling --- */
+
+.btn-set-remove {
+  background: rgba(180, 40, 40, 0.25);
+  border: 1px solid rgba(255, 80, 80, 0.5);
+  color: #ff8080;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.btn-set-remove:hover {
+  background: rgba(200, 40, 40, 0.35);
+  border-color: rgba(255, 100, 100, 0.8);
+}
+
+.btn-set-add {
+  background: rgba(40, 150, 70, 0.25);
+  border: 1px solid rgba(60, 200, 100, 0.5);
+  color: #7CFFB0;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.btn-set-add:hover {
+  background: rgba(40, 170, 70, 0.35);
+  border-color: rgba(60, 220, 120, 0.8);
+}
