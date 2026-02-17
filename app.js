@@ -1758,95 +1758,118 @@ function wireProgressSearch() {
 
 // Save workout sets (+ PR detection)
 $("saveWorkoutBtn").addEventListener("click", async () => {
-  if (!activeWorkout) return;
+  if (!activeWorkout) return;
 
-  const btn = $("saveWorkoutBtn");
-  btn.disabled = true;
-  const originalText = btn.textContent;
-  btn.textContent = "Saving...";
+  const btn = $("saveWorkoutBtn");
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Saving...";
 
-  try {
-    const userId = getUserIdOrThrow();
-// ✅ If we haven't created the workout in Supabase yet, do it now (only on Save)
-if (!activeWorkout.workoutId) {
-  const workout = await createWorkout(userId);
-  if (!workout?.id) throw new Error("Failed to create workout.");
-  activeWorkout.workoutId = workout.id;
+  try {
+    const userId = getUserIdOrThrow();
 
-  // create workout_exercises from the current activeWorkout order/grouping
-  const body = (activeWorkout.items || []).map((it) => ({
-    workout_id: workout.id,
-    exercise_id: it.exerciseId,
-    order_index: it.order_index ?? 0,
-    group_id: it.group_id ?? null,
-    group_order: it.group_order ?? null,
-    original_group: it.original_group ?? (it.group_id ?? null),
-    is_skipped: !!it.is_skipped,
-  }));
+    // ✅ If we haven't created the workout in Supabase yet, do it now (only on Save)
+    if (!activeWorkout.workoutId) {
+      const workout = await createWorkout(userId);
+      if (!workout?.id) throw new Error("Failed to create workout.");
+      activeWorkout.workoutId = workout.id;
 
-  const created = await fetchJSON(`/rest/v1/workout_exercises`, {
-    method: "POST",
-    headers: { Prefer: "return=representation" },
-    body,
-  });
+      // create workout_exercises from the current activeWorkout order/grouping
+      const body = (activeWorkout.items || []).map((it) => ({
+        workout_id: workout.id,
+        exercise_id: it.exerciseId,
+        order_index: it.order_index ?? 0,
+        group_id: it.group_id ?? null,
+        group_order: it.group_order ?? null,
+        original_group: it.original_group ?? (it.group_id ?? null),
+        is_skipped: !!it.is_skipped, // ✅ consistent key
+      }));
 
-  // map created rows back onto activeWorkout items so sets can reference workout_exercise_id
-  const byExerciseId = new Map((created || []).map((we) => [String(we.exercise_id), we]));
-  (activeWorkout.items || []).forEach((it) => {
-    const we = byExerciseId.get(String(it.exerciseId));
-    if (we) it.workoutExerciseId = we.id;
-  });
-}
-    const rows = [];
-    for (const item of activeWorkout.items) {
-      if (item.isSkipped) continue;
-      for (const s of item.sets) {
-        const hasAny =
-          String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
-        if (!hasAny) continue;
+      const created = await fetchJSON(
+        `/rest/v1/workout_exercises?select=id,exercise_id,order_index,group_id,group_order,is_skipped`,
+        {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body,
+        }
+      );
 
-        rows.push({
-          workout_exercise_id: item.workoutExerciseId,
-          set_index: s.set_index,
-          weight: String(s.weight).trim() === "" ? null : Number(s.weight),
-          reps: String(s.reps).trim() === "" ? null : Number(s.reps),
-          is_warmup: false,
-        });
-      }
-    }
+      // Map created rows back onto activeWorkout items so sets can reference workout_exercise_id.
+      // Prefer match by (exercise_id + order_index) to handle duplicates safely.
+      const byKey = new Map(
+        (created || []).map((we) => [
+          `${String(we.exercise_id)}|${String(we.order_index ?? 0)}`,
+          we,
+        ])
+      );
 
-    await insertSets(rows);
+      (activeWorkout.items || []).forEach((it) => {
+        const key = `${String(it.exerciseId)}|${String(it.order_index ?? 0)}`;
+        const we = byKey.get(key);
+        if (we) it.workoutExerciseId = we.id;
+      });
+    }
 
-    // PR detection (best-effort; don’t block save UX)
-    let prMsg = "";
-    try {
-      const prs = await detectPRsForWorkout(userId, activeWorkout.items);
-      if (prs.length) {
-        const lines = prs.map((p) => {
-          const bits = [];
-          if (p.newMaxWeight != null) bits.push(`Max weight PR: ${p.newMaxWeight}`);
-          if (p.newBestE1RM != null) bits.push(`e1RM PR: ${p.newBestE1RM.toFixed(1)}`);
-          return `🏆 ${p.exerciseName} — ${bits.join(" | ")}`;
-        });
-        prMsg = "\n" + lines.join("\n");
-      }
-    } catch (e) {
-      console.warn("PR detection failed (non-blocking):", e);
-    }
+    const rows = [];
+    for (const item of activeWorkout.items) {
+      if (item.is_skipped) continue; // ✅ consistent key
 
-    setWorkoutMsg(`Saved ✅${prMsg}`);
-    activeWorkout = null;
-    hide($("saveWorkoutBtn"));
-    renderActiveWorkout();
-    await refreshHistory();
+      // If user entered any set data but we don't have a workoutExerciseId, stop and explain
+      const hasAnyEntered = (item.sets || []).some(
+        (s) => String(s.weight).trim() !== "" || String(s.reps).trim() !== ""
+      );
+      if (hasAnyEntered && !item.workoutExerciseId) {
+        throw new Error(
+          `Missing workoutExerciseId for "${item.exerciseName}". Try Save again after a refresh.`
+        );
+      }
 
-  } catch (err) {
-    console.error(err);
-    alert(String(err.message || err));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
+      for (const s of item.sets) {
+        const hasAny =
+          String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
+        if (!hasAny) continue;
+
+        rows.push({
+          workout_exercise_id: item.workoutExerciseId,
+          set_index: s.set_index,
+          weight: String(s.weight).trim() === "" ? null : Number(s.weight),
+          reps: String(s.reps).trim() === "" ? null : Number(s.reps),
+          is_warmup: false,
+        });
+      }
+    }
+
+    await insertSets(rows);
+
+    // PR detection (best-effort; don’t block save UX)
+    let prMsg = "";
+    try {
+      const prs = await detectPRsForWorkout(userId, activeWorkout.items);
+      if (prs.length) {
+        const lines = prs.map((p) => {
+          const bits = [];
+          if (p.newMaxWeight != null) bits.push(`Max weight PR: ${p.newMaxWeight}`);
+          if (p.newBestE1RM != null) bits.push(`e1RM PR: ${p.newBestE1RM.toFixed(1)}`);
+          return `🏆 ${p.exerciseName} — ${bits.join(" | ")}`;
+        });
+        prMsg = "\n" + lines.join("\n");
+      }
+    } catch (e) {
+      console.warn("PR detection failed (non-blocking):", e);
+    }
+
+    setWorkoutMsg(`Saved ✅${prMsg}`);
+    activeWorkout = null;
+    hide($("saveWorkoutBtn"));
+    renderActiveWorkout();
+    await refreshHistory();
+  } catch (err) {
+    console.error(err);
+    alert(String(err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 });
 
 // --------------------
