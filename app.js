@@ -1387,9 +1387,7 @@ $("startWorkoutBtn").addEventListener("click", async () => {
     const nameByExerciseId = new Map(
       tpl.items.map((it) => [it.exercise_id, it.exercise_name])
     );
-const tplByExerciseId = new Map(
-  (tpl.items || []).map(it => [String(it.exercise_id), it])
-);
+
     const ssMap = loadSupersetMap(templateId);
 
     activeWorkout = {
@@ -1397,38 +1395,21 @@ const tplByExerciseId = new Map(
       items: (weInserted || [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         .map((we) => {
-  const tplItem = tplByExerciseId.get(String(we.exercise_id)) || null;
   const prevSets = lastSetsMap.get(we.exercise_id);
 
   // ✅ superset id from localStorage
   const ssId = ssMap.get(String(we.exercise_id)) || null;
 
   return {
-  workoutExerciseId: we.id,
-  exerciseId: we.exercise_id,
-  exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
-  order_index: we.order_index ?? 0,
-
-  group_id: gid,
-  group_order: gorder,
-  original_group: we.original_group ?? gid,
-
-  is_skipped: we.is_skipped ?? false,
-  supersetId: ssId,
-  sets: (() => { ... })(),
-};
+    workoutExerciseId: we.id,
+    exerciseId: we.exercise_id,
+    exerciseName: nameByExerciseId.get(we.exercise_id) || "Exercise",
+    order_index: we.order_index ?? 0,
 
     // ✅ IMPORTANT: fall back to ssId so supersets can render as one card
-    const gid =
-  we.group_id ??
-  tplItem?.group_id ??
-  ssId ??
-  null;
-
-const gorder =
-  we.group_order ??
-  tplItem?.group_order ??
-  null;
+    group_id: we.group_id ?? ssId,
+    group_order: we.group_order ?? null,
+    original_group: we.original_group ?? we.group_id ?? ssId,
 
     is_skipped: we.is_skipped ?? false,
 
