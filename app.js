@@ -1335,6 +1335,7 @@ const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
     host.appendChild(card);
   }
 }
+
 // Start workout (autofill last set if available)
 $("startWorkoutBtn").addEventListener("click", async () => {
   const btn = $("startWorkoutBtn");
@@ -1412,7 +1413,7 @@ activeWorkout = {
 window.__workoutState = activeWorkout;
 window.__workoutStateLastUpdated = Date.now();
     activeWorkout = {
-      workoutId: workout.id,
+      workoutId: activeWorkout.workoutid,
       items: (weInserted || [])
         .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         .map((we) => {
