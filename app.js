@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-H");
+console.log("APP VERSION: 2026-02-17-J");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1958,11 +1958,14 @@ async function loadWorkoutDetail(workoutId) {
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
     .map((we) => ({
       ...we,
-      sets: (we.sets || []).slice().sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0)),
+      sets: (we.sets || [])
+        .slice()
+        .sort((a, b) => (a.set_index ?? 0) - (b.set_index ?? 0)),
     }));
 
   return { ...data, workout_exercises: wes };
 }
+
 async function deleteWorkoutCascade(workoutId) {
   // 1) load workout_exercise ids
   const weParams = new URLSearchParams();
@@ -2005,8 +2008,35 @@ async function showWorkoutDetail(workoutId) {
   header.style.justifyContent = "space-between";
   header.style.alignItems = "center";
 
+  // ✅ Template name at top (not "program name")
+  const tplName = w.workout_templates?.name || "Workout";
+
+  // ✅ Date/time without seconds
+  const performed = new Date(w.performed_at);
+  const dateStr = performed.toLocaleDateString(undefined, {
+    month: "2-digit",
+    day: "2-digit",
+    year: "2-digit",
+  });
+  const timeStr = performed.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  // Left side: template name + date/time
+  const left = document.createElement("div");
+  left.style.display = "flex";
+  left.style.flexDirection = "column";
+  left.style.gap = "4px";
+
   const title = document.createElement("h3");
-  title.textContent = new Date(w.performed_at).toLocaleString();
+  title.textContent = tplName;
+
+  const sub = document.createElement("div");
+  sub.className = "small muted";
+  sub.textContent = `${dateStr} • ${timeStr}`;
+
+  left.append(title, sub);
 
   const back = document.createElement("button");
   back.className = "secondary";
@@ -2017,33 +2047,34 @@ async function showWorkoutDetail(workoutId) {
     detail.innerHTML = "";
   };
 
-const actions = document.createElement("div");
-actions.className = "row";
-actions.style.gap = "8px";
+  const actions = document.createElement("div");
+  actions.className = "row";
+  actions.style.gap = "8px";
 
-const del = document.createElement("button");
-del.className = "secondary";
-del.textContent = "Delete workout";
-del.onclick = async () => {
-  const ok = confirm("Delete this workout from history? This cannot be undone.");
-  if (!ok) return;
+  const del = document.createElement("button");
+  del.className = "secondary";
+  del.textContent = "Delete workout";
+  del.onclick = async () => {
+    const ok = confirm("Delete this workout from history? This cannot be undone.");
+    if (!ok) return;
 
-  try {
-    await deleteWorkoutCascade(workoutId);
+    try {
+      await deleteWorkoutCascade(workoutId);
 
-    detail.classList.add("hidden");
-    list.classList.remove("hidden");
-    detail.innerHTML = "";
+      detail.classList.add("hidden");
+      list.classList.remove("hidden");
+      detail.innerHTML = "";
 
-    await refreshHistory();
-  } catch (e) {
-    console.error(e);
-    alert(`Failed to delete workout: ${String(e.message || e)}`);
-  }
-};
+      await refreshHistory();
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to delete workout: ${String(e.message || e)}`);
+    }
+  };
 
-actions.append(del, back);
-header.append(title, actions);
+  actions.append(del, back);
+
+  header.append(left, actions);
   wrap.appendChild(header);
 
   (w.workout_exercises || []).forEach((we, i) => {
@@ -2056,7 +2087,11 @@ header.append(title, actions);
     ex.innerHTML = `
       <div><b>${i + 1}. ${name}</b></div>
       <div class="small">
-        ${sets.length ? sets.map((s, idx) => `Set ${idx + 1}: ${fmtSet(s)}`).join("<br/>") : "No sets saved"}
+        ${
+          sets.length
+            ? sets.map((s, idx) => `Set ${idx + 1}: ${fmtSet(s)}`).join("<br/>")
+            : "No sets saved"
+        }
       </div>
     `;
 
