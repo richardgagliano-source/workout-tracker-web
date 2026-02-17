@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-16-A");
+console.log("APP VERSION: 2026-02-16-B");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1151,7 +1151,7 @@ function renderActiveWorkout() {
   const host = $("activeWorkout");
   if (!host) return;
   host.innerHTML = "";
-host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;opacity:.7;">APP VERSION: 2026-02-16-A</div>`);
+host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;opacity:.7;">APP VERSION: 2026-02-16-B</div>`);
   if (!activeWorkout) {
     host.innerHTML = `<div class="muted">Select a workout and get that pussy a poppin'!</div>`;
     return;
@@ -1241,7 +1241,12 @@ const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
     members.forEach((m) => seen.add(m.workoutExerciseId));
     groups.push({ type: "superset", group_id: gid, items: members.slice(0, 3) });
   }
-
+host.insertAdjacentHTML(
+  "afterbegin",
+  `<div class="muted" style="font-size:12px;">
+    GROUP COUNT: ${groups.length}
+  </div>`
+);
   for (const g of groups) {
     if (g.type === "single") {
       const item = g.items[0];
