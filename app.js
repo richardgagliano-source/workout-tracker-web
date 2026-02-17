@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-16-G");
+console.log("APP VERSION: 2026-02-16-H");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1115,11 +1115,6 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
 // --------------------
 // Workouts: create + add exercises + save sets
 // --------------------
-async function createWorkout(userId) {
-  const body = [{ user_id: userId, performed_at: new Date().toISOString(), notes: null }];
-  const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
-  return created?.[0];
-}
 
 async function createWorkout(userId, templateId) {
   const body = [{
