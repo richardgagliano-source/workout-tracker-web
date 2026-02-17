@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-C");
+console.log("APP VERSION: 2026-02-17-D");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1825,9 +1825,9 @@ function historyFilterToQuery(filterValue) {
 async function loadHistory(userId, filterValue) {
   const { limit, performedAfterISO } = historyFilterToQuery(filterValue);
 
-  // 1) Load workouts (include template_id)
+  // 1) Load workouts (include template_id + program_name)
   const params = new URLSearchParams();
-  params.set("select", "id,performed_at,notes,template_id");
+  params.set("select", "id,performed_at,notes,template_id,program_name");
   params.set("user_id", `eq.${userId}`);
   params.set("order", "performed_at.desc");
   params.set("limit", String(limit));
@@ -1841,6 +1841,7 @@ async function loadHistory(userId, filterValue) {
 
   // 2) Count exercises per workout
   const ids = workouts.map((w) => w.id).join(",");
+
   const weParams = new URLSearchParams();
   weParams.set("select", "workout_id");
   weParams.set("workout_id", `in.(${ids})`);
@@ -1849,8 +1850,8 @@ async function loadHistory(userId, filterValue) {
   const counts = new Map();
   wes.forEach((r) => counts.set(r.workout_id, (counts.get(r.workout_id) || 0) + 1));
 
-  // 3) Load template names (program names) by template_id
-  const tplIds = [...new Set(workouts.map(w => w.template_id).filter(Boolean))];
+  // 3) Load template names by template_id (fallback if program_name is missing)
+  const tplIds = [...new Set(workouts.map((w) => w.template_id).filter(Boolean))];
   let tplNameById = new Map();
 
   if (tplIds.length) {
@@ -1859,14 +1860,18 @@ async function loadHistory(userId, filterValue) {
     tplParams.set("id", `in.(${tplIds.join(",")})`);
 
     const tpls = (await fetchJSON(`/rest/v1/workout_templates?${tplParams.toString()}`)) || [];
-    tplNameById = new Map(tpls.map(t => [t.id, t.name]));
+    tplNameById = new Map(tpls.map((t) => [t.id, t.name]));
   }
 
-  return workouts.map((w) => ({
-    ...w,
-    exercise_count: counts.get(w.id) || 0,
-    program_name: w.template_id ? (tplNameById.get(w.template_id) || "(Unknown program)") : "(No program)",
-  }));
+  return workouts.map((w) => {
+    const fallbackName = w.template_id ? (tplNameById.get(w.template_id) || "(Unknown program)") : "(No program)";
+    return {
+      ...w,
+      exercise_count: counts.get(w.id) || 0,
+      // prefer saved program_name; fallback to template name
+      program_name: (w.program_name && String(w.program_name).trim()) ? w.program_name : fallbackName,
+    };
+  });
 }
 
 async function refreshHistory() {
@@ -1908,7 +1913,7 @@ const rows = await loadHistory(userId, filterValue);
   day: "numeric",
 });
 
-const programName = w.workout_templates?.name ||  "Workout";
+const programName = w.program_name ||  "Workout";
 
 const exCount = w.exercise_count ?? 0;
 
