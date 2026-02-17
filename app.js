@@ -1175,9 +1175,9 @@ function renderActiveWorkout() {
       r.value = s.reps ?? "";
       r.oninput = () => (s.reps = r.value);
 
-      const del = document.createElement("button");
-      del.className = "secondary";
-      del.textContent = "Remove";
+const del = document.createElement("button");
+del.className = "btn-set-remove";
+del.textContent = "− set";
       del.onclick = () => {
         item.sets = item.sets
           .filter((_, j) => j !== si)
@@ -1192,8 +1192,8 @@ function renderActiveWorkout() {
 
   function addSetButton(item, setsBox) {
     const addSet = document.createElement("button");
-    addSet.className = "secondary";
-    addSet.textContent = "Add set";
+addSet.className = "btn-set-add";
+addSet.textContent = "+ set";
     addSet.onclick = () => {
       item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
       renderSetsUI(item, setsBox);
