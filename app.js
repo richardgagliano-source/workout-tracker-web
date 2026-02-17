@@ -1151,7 +1151,6 @@ function renderActiveWorkout() {
   const host = $("activeWorkout");
   if (!host) return;
   host.innerHTML = "";
-host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;opacity:.7;">APP VERSION: 2026-02-16-B</div>`);
   if (!activeWorkout) {
     host.innerHTML = `<div class="muted">Select a workout and get that pussy a poppin'!</div>`;
     return;
@@ -1209,22 +1208,10 @@ host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:12px;
 
   // deterministic order by order_index (or fallback)
   const ordered = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-  host.insertAdjacentHTML(
-  "afterbegin",
-  `<div class="muted" style="font-size:11px;opacity:.7;line-height:1.2;word-break:break-word;">
-    GROUPS: ${ordered.map(x => `${x.exerciseName}:${x.group_id ?? x.groupId ?? x.supersetId ?? "null"}`).join(" | ")}
-  </div>`
-);
-const debug = ordered.map(x => `${x.exerciseName}:${x.group_id ?? "null"}`).join(" | ");
-host.insertAdjacentHTML("afterbegin", `<div class="muted" style="font-size:11px;opacity:.7;line-height:1.2;">${debug}</div>`);
+
   
   // DEBUG: show group ids on mobile
-host.insertAdjacentHTML(
-  "afterbegin",
-  `<div class="muted" style="font-size:11px;opacity:.7;line-height:1.2;word-break:break-word;">
-    GROUPS: ${ordered.map(x => `${x.exerciseName}:${x.group_id ?? x.groupId ?? "null"}`).join(" | ")}
-  </div>`
-);
+
   for (const it of ordered) {
     if (seen.has(it.workoutExerciseId)) continue;
 
@@ -1241,12 +1228,7 @@ const gid = it.group_id ?? it.groupId ?? null;    if (!gid) {
     members.forEach((m) => seen.add(m.workoutExerciseId));
     groups.push({ type: "superset", group_id: gid, items: members.slice(0, 3) });
   }
-host.insertAdjacentHTML(
-  "afterbegin",
-  `<div class="muted" style="font-size:12px;">
-    GROUP COUNT: ${groups.length}
-  </div>`
-);
+
   for (const g of groups) {
     if (g.type === "single") {
       const item = g.items[0];
