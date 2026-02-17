@@ -1124,13 +1124,12 @@ async function loadLastSetsByExercise(userId, exerciseIds) {
 // Workouts: create + add exercises + save sets
 // --------------------
 
-async function createWorkout(userId, templateId, programName) {
+async function createWorkout(userId, templateId) {
   const body = [{
     user_id: userId,
     performed_at: new Date().toISOString(),
     notes: null,
-    template_id: templateId ?? null,
-    program_name: programName ?? null, // ✅ add this column in Supabase if you haven't
+    template_id: templateId ?? null, // keep FK only
   }];
 
   const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
