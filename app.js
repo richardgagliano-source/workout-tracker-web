@@ -1128,9 +1128,6 @@ async function createWorkout(userId, templateId, programName) {
   const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
   return created?.[0];
 }
-  const created = await fetchJSON(`/rest/v1/workouts`, { method: "POST", body });
-  return created?.[0];
-}
 
 async function createWorkoutExercises(workoutId, templateItems) {
   const body = templateItems.map((it) => ({
