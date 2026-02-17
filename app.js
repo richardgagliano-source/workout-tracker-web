@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-17-F");
+console.log("APP VERSION: 2026-02-17-G");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1379,7 +1379,7 @@ $("startWorkoutBtn").addEventListener("click", async () => {
       lastSetsMap = new Map();
     }
 
-const workout = await createWorkout(userId, templateId, tpl.name);
+const workout = await createWorkout(userId, templateId);
     if (!workout?.id) throw new Error("Failed to create workout.");
 
     const weInserted = await createWorkoutExercises(workout.id, tpl.items);
