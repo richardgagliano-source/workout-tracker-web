@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-27-C");
+console.log("APP VERSION: 2026-02-27-D");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1958,7 +1958,7 @@ async function loadHistory(userId, filterValue) {
 
   const params = new URLSearchParams();
   // include the related template name via the relationship
-  params.set("select", "id,performed_at,notes,template_id,workout_templates(name)");
+params.set("select", "id,performed_at,notes,difficulty_rating,workout_notes,workout_templates(name)");
   params.set("user_id", `eq.${userId}`);
   params.set("order", "performed_at.desc");
   params.set("limit", String(limit));
@@ -2034,10 +2034,30 @@ async function refreshHistory() {
       const programName = w.template_name || "Workout";
       const exCount = w.exercise_count ?? 0;
 
+      // ✅ Step 2/3: difficulty + notes (only show if present)
+      const rating =
+        w.difficulty_rating != null && w.difficulty_rating !== ""
+          ? Number(w.difficulty_rating)
+          : null;
+
+      const notes = String(w.workout_notes || "").trim();
+
+      const ratingHtml =
+        rating != null && !Number.isNaN(rating)
+          ? `<div class="small muted">Difficulty: <b>${escapeHtml(String(rating))}/10</b></div>`
+          : "";
+
+      const notesHtml =
+        notes
+          ? `<div class="small muted" style="margin-top:6px;">📝 ${escapeHtml(notes)}</div>`
+          : "";
+
       card.innerHTML = `
         <h3>${escapeHtml(programName)}</h3>
         <div class="small muted">${escapeHtml(dateOnly)}</div>
         <div class="small">${exCount} exercises</div>
+        ${ratingHtml}
+        ${notesHtml}
       `;
 
       card.addEventListener("click", () => showWorkoutDetail(w.id));
