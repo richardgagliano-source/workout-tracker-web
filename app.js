@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-27-B");
+console.log("APP VERSION: 2026-02-27-C");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -306,7 +306,107 @@ async function loadExercises(search = "") {
   return await fetchJSON(`/rest/v1/exercises?${params.toString()}`);
 }
 
+function promptWorkoutFeedback({ defaultDifficulty = 7 } = {}) {
+  return new Promise((resolve) => {
+    const existing = document.getElementById("workoutFeedbackModal");
+    if (existing) existing.remove();
 
+    const overlay = document.createElement("div");
+    overlay.id = "workoutFeedbackModal";
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(0,0,0,0.55)";
+    overlay.style.backdropFilter = "blur(6px)";
+    overlay.style.zIndex = "9999";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.padding = "16px";
+
+    const modal = document.createElement("div");
+    modal.className = "item";
+    modal.style.maxWidth = "520px";
+    modal.style.width = "100%";
+
+    const title = document.createElement("h3");
+    title.textContent = "Rate the difficulty of this workout";
+
+    const sub = document.createElement("div");
+    sub.className = "small muted";
+    sub.textContent = "1 = very easy, 10 = brutal";
+
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.alignItems = "center";
+    row.style.justifyContent = "space-between";
+    row.style.gap = "12px";
+    row.style.marginTop = "10px";
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "1";
+    slider.max = "10";
+    slider.step = "1";
+    slider.value = String(Number(defaultDifficulty) || 7);
+    slider.style.width = "100%";
+
+    const val = document.createElement("div");
+    val.style.minWidth = "36px";
+    val.style.textAlign = "right";
+    val.style.fontWeight = "700";
+    val.textContent = slider.value;
+
+    slider.oninput = () => (val.textContent = slider.value);
+    row.append(slider, val);
+
+    const notesLabel = document.createElement("div");
+    notesLabel.className = "small muted";
+    notesLabel.style.marginTop = "12px";
+    notesLabel.textContent = "Notes about this workout";
+
+    const notes = document.createElement("textarea");
+    notes.placeholder = "Anything you want to remember…";
+    notes.rows = 4;
+    notes.style.width = "100%";
+    notes.style.marginTop = "6px";
+
+    const actions = document.createElement("div");
+    actions.className = "row";
+    actions.style.justifyContent = "flex-end";
+    actions.style.gap = "10px";
+    actions.style.marginTop = "12px";
+
+    const skip = document.createElement("button");
+    skip.className = "secondary";
+    skip.textContent = "Skip";
+
+    const save = document.createElement("button");
+    save.textContent = "Save";
+
+    function cleanup(result) {
+      overlay.remove();
+      resolve(result);
+    }
+
+    skip.onclick = () => cleanup(null);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) cleanup(null);
+    };
+
+    save.onclick = () =>
+      cleanup({
+        difficulty_rating: Number(slider.value),
+        workout_notes: notes.value.trim() || null,
+      });
+
+    actions.append(skip, save);
+    modal.append(title, sub, row, notesLabel, notes, actions);
+    overlay.append(modal);
+    document.body.append(overlay);
+
+    setTimeout(() => notes.focus(), 0);
+  });
+}
 // --- YouTube helper (for exercise video thumbnails) ---
 function getYouTubeId(url) {
   try {
@@ -1756,7 +1856,7 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
 
     const rows = [];
     for (const item of activeWorkout.items) {
-      if (item.isSkipped) continue;
+      if (item.is_Skipped) continue;
       for (const s of item.sets) {
         const hasAny =
           String(s.weight).trim() !== "" || String(s.reps).trim() !== "";
@@ -1773,211 +1873,12 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
     }
 
     await insertSets(rows);
-function promptWorkoutFeedback({ defaultDifficulty = 5 } = {}) {
-  return new Promise((resolve) => {
-    // Remove any existing modal
-    const existing = document.getElementById("workoutFeedbackModal");
-    if (existing) existing.remove();
 
-    const modal = document.createElement("div");
-    modal.id = "workoutFeedbackModal";
-    modal.style.position = "fixed";
-    modal.style.inset = "0";
-    modal.style.zIndex = "9999";
-    modal.style.display = "flex";
-    modal.style.alignItems = "center";
-    modal.style.justifyContent = "center";
-    modal.style.padding = "16px";
-    modal.style.background = "rgba(0,0,0,0.55)";
-
-    modal.innerHTML = `
-      <div style="
-        width: min(520px, 100%);
-        border-radius: 18px;
-        padding: 16px;
-        background: rgba(25, 25, 28, 0.92);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255,255,255,0.10);
-        box-shadow: 0 20px 60px rgba(0,0,0,0.45);
-        color: rgba(255,255,255,0.92);
-      ">
-        <div style="font-size: 18px; font-weight: 800; margin-bottom: 10px;">
-          Rate the difficulty of this workout
-        </div>
-
-        <div style="display:flex; align-items:center; gap:12px; margin: 10px 0 14px;">
-          <input id="wfDifficulty" type="range" min="1" max="10" step="1" value="${Number(defaultDifficulty) || 5}"
-            style="flex:1;" />
-          <div style="min-width: 34px; text-align:center; font-weight: 800;">
-            <span id="wfDifficultyVal">${Number(defaultDifficulty) || 5}</span>/10
-          </div>
-        </div>
-
-        <div style="font-size: 14px; opacity: 0.8; margin-bottom: 6px;">
-          Notes about this workout (optional)
-        </div>
-        <textarea id="wfNotes" rows="4" placeholder="Anything you want to remember…"
-          style="
-            width: 100%;
-            resize: vertical;
-            border-radius: 12px;
-            padding: 10px 12px;
-            border: 1px solid rgba(255,255,255,0.12);
-            background: rgba(255,255,255,0.06);
-            color: rgba(255,255,255,0.92);
-            outline: none;
-          "></textarea>
-
-        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top: 14px;">
-          <button id="wfCancel" class="secondary">Skip</button>
-          <button id="wfSave">Save</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    const slider = modal.querySelector("#wfDifficulty");
-    const val = modal.querySelector("#wfDifficultyVal");
-    const notes = modal.querySelector("#wfNotes");
-    const btnCancel = modal.querySelector("#wfCancel");
-    const btnSave = modal.querySelector("#wfSave");
-
-    slider.addEventListener("input", () => (val.textContent = slider.value));
-
-    const cleanup = () => modal.remove();
-
-    // Click outside card to cancel
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) {
-        cleanup();
-        resolve(null);
-      }
-    });
-
-    btnCancel.addEventListener("click", () => {
-      cleanup();
-      resolve(null);
-    });
-
-    btnSave.addEventListener("click", () => {
-      const difficulty = Number(slider.value);
-      const workout_notes = String(notes.value || "").trim();
-      cleanup();
-      resolve({ difficulty, workout_notes });
-    });
-  });
-}
-  
-  function promptWorkoutFeedback() {
-  return new Promise((resolve) => {
-    // overlay
-    const overlay = document.createElement("div");
-    overlay.style.position = "fixed";
-    overlay.style.inset = "0";
-    overlay.style.background = "rgba(0,0,0,0.55)";
-    overlay.style.backdropFilter = "blur(6px)";
-    overlay.style.zIndex = "9999";
-    overlay.style.display = "flex";
-    overlay.style.alignItems = "center";
-    overlay.style.justifyContent = "center";
-    overlay.style.padding = "16px";
-
-    // modal
-    const modal = document.createElement("div");
-    modal.className = "item";
-    modal.style.maxWidth = "520px";
-    modal.style.width = "100%";
-
-    const title = document.createElement("h3");
-    title.textContent = "Rate the difficulty of this workout";
-
-    const sub = document.createElement("div");
-    sub.className = "small muted";
-    sub.textContent = "1 = very easy, 10 = brutal";
-
-    const row = document.createElement("div");
-    row.className = "row";
-    row.style.alignItems = "center";
-    row.style.justifyContent = "space-between";
-    row.style.gap = "12px";
-    row.style.marginTop = "10px";
-
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.min = "1";
-    slider.max = "10";
-    slider.step = "1";
-    slider.value = "7";
-    slider.style.width = "100%";
-
-    const val = document.createElement("div");
-    val.style.minWidth = "36px";
-    val.style.textAlign = "right";
-    val.style.fontWeight = "700";
-    val.textContent = slider.value;
-
-    slider.oninput = () => (val.textContent = slider.value);
-
-    row.append(slider, val);
-
-    const notesLabel = document.createElement("div");
-    notesLabel.className = "small muted";
-    notesLabel.style.marginTop = "12px";
-    notesLabel.textContent = "Notes about this workout";
-
-    const notes = document.createElement("textarea");
-    notes.placeholder = "e.g. slept 4 hrs, felt strong on squats, shoulder a little tight…";
-    notes.rows = 4;
-    notes.style.width = "100%";
-    notes.style.marginTop = "6px";
-
-    const actions = document.createElement("div");
-    actions.className = "row";
-    actions.style.justifyContent = "flex-end";
-    actions.style.gap = "10px";
-    actions.style.marginTop = "12px";
-
-    const skip = document.createElement("button");
-    skip.className = "secondary";
-    skip.textContent = "Skip";
-
-    const save = document.createElement("button");
-    save.textContent = "Save rating";
-
-    function cleanup(result) {
-      overlay.remove();
-      resolve(result);
-    }
-
-    skip.onclick = () => cleanup(null);
-    overlay.onclick = (e) => {
-      if (e.target === overlay) cleanup(null);
-    };
-    save.onclick = () =>
-      cleanup({
-        difficulty_rating: Number(slider.value),
-        workout_notes: notes.value.trim() || null,
-      });
-
-    actions.append(skip, save);
-
-    modal.append(title, sub, row, notesLabel, notes, actions);
-    overlay.append(modal);
-    document.body.append(overlay);
-
-    // focus notes for convenience
-    setTimeout(() => notes.focus(), 0);
-  });
-}
     // ✅ After saving sets, ask for difficulty + notes, then store on workout
+const workoutId = activeWorkout?.workoutId; // capture while it exists
 const feedback = await promptWorkoutFeedback();
-if (feedback && activeWorkout?.workoutId) {
-  await fetchJSON(`/rest/v1/workouts?id=eq.${activeWorkout.workoutId}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    body: feedback, // { difficulty_rating, workout_notes }
-  });
+if (feedback && workoutId) {
+  await saveWorkoutFeedback(workoutId, feedback);
 }
     // PR detection (best-effort; don’t block save UX)
     let prMsg = "";
@@ -2014,11 +1915,10 @@ async function saveWorkoutFeedback(workoutId, feedback) {
   if (!workoutId || !feedback) return;
 
   const body = {
-    difficulty: feedback.difficulty ?? null,
+    difficulty_rating: feedback.difficulty_rating ?? null,
     workout_notes: feedback.workout_notes ?? null,
   };
 
-  // PATCH /workouts?id=eq.<workoutId>
   await fetchJSON(`/rest/v1/workouts?id=eq.${workoutId}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
