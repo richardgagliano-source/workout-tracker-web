@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-27-F");
+console.log("APP VERSION: 2026-02-27-G");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1557,11 +1557,7 @@ const workout = await createWorkout(userId, templateId);
     btn.textContent = originalText;
   }
 });
-// After sets successfully saved:
-const feedback = await promptWorkoutFeedback({ defaultDifficulty: 5 });
-if (feedback) {
-  await saveWorkoutFeedback(activeWorkout.workoutId, feedback);
-}
+
 // --------------------
 // Progress + PR detection (NEW)
 // --------------------
