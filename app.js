@@ -2131,82 +2131,131 @@ async function deleteWorkoutCascade(workoutId) {
   await fetchJSON(`/rest/v1/workouts?id=eq.${workoutId}`, { method: "DELETE" });
 }
 
-async function refreshHistory() {
-  const host = $("historyList");
-  const detail = $("historyDetail");
+async function showWorkoutDetail(workoutId) {
+  const detail = $("historyDetail");
+  const list = $("historyList");
 
-  detail.classList.add("hidden");
-  detail.innerHTML = "";
-  host.classList.remove("hidden");
+  detail.classList.remove("hidden");
+  list.classList.add("hidden");
+  detail.innerHTML = "Loading...";
 
-  host.innerHTML = "Loading...";
+  const w = await loadWorkoutDetail(workoutId);
 
-  let userId;
-  try {
-    userId = getUserIdOrThrow();
-  } catch {
-    host.innerHTML = '<div class="muted">Not signed in.</div>';
-    return;
-  }
+  const wrap = document.createElement("div");
+  wrap.className = "item";
 
-  try {
-    const filterValue = $("historyFilter")?.value || "20";
-    const rows = await loadHistory(userId, filterValue);
-    host.innerHTML = "";
+  // --- Header (template name + date + rating + notes) ---
+  const header = document.createElement("div");
+  header.className = "row";
+  header.style.justifyContent = "space-between";
+  header.style.alignItems = "flex-start";
 
-    if (!rows.length) {
-      host.innerHTML = '<div class="muted">No workouts yet. Start one in the Workout tab.</div>';
-      return;
-    }
+  const left = document.createElement("div");
 
-    rows.forEach((w) => {
-      const card = document.createElement("div");
-      card.className = "item";
-      card.style.cursor = "pointer";
+  const templateName = w.workout_templates?.name || w.template_name || "Workout";
 
-      // format date as "Mar 7, 2026"
-      const dateOnly = new Date(w.performed_at).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+  const dateOnly = new Date(w.performed_at).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
-      const programName = w.template_name || "Workout";
-      const exCount = w.exercise_count ?? 0;
+  const title = document.createElement("h3");
+  title.style.margin = "0";
+  title.textContent = templateName;
 
-      // ✅ Step 2/3: difficulty + notes (only show if present)
-      const rating =
-        w.difficulty_rating != null && w.difficulty_rating !== ""
-          ? Number(w.difficulty_rating)
-          : null;
+  const dateEl = document.createElement("div");
+  dateEl.className = "small muted";
+  dateEl.textContent = dateOnly;
 
-      const notes = String(w.workout_notes || "").trim();
+  // Difficulty + notes
+  const rating =
+    w.difficulty_rating != null && w.difficulty_rating !== ""
+      ? Number(w.difficulty_rating)
+      : null;
 
-      const ratingHtml =
-        rating != null && !Number.isNaN(rating)
-          ? `<div class="small muted">Difficulty: <b>${escapeHtml(String(rating))}/10</b></div>`
-          : "";
+  const notes = String(w.workout_notes || "").trim();
 
-      const notesHtml =
-        notes
-          ? `<div class="small muted" style="margin-top:6px;">📝 ${escapeHtml(notes)}</div>`
-          : "";
+  const ratingEl = document.createElement("div");
+  ratingEl.className = "small muted";
+  ratingEl.style.marginTop = "6px";
+  ratingEl.innerHTML =
+    rating != null && !Number.isNaN(rating)
+      ? `Difficulty: <b>${escapeHtml(String(rating))}/10</b>`
+      : "";
 
-      card.innerHTML = `
-        <h3>${escapeHtml(programName)}</h3>
-        <div class="small muted">${escapeHtml(dateOnly)}</div>
-        <div class="small">${exCount} exercises</div>
-        ${ratingHtml}
-        ${notesHtml}
-      `;
+  const notesEl = document.createElement("div");
+  notesEl.className = "small muted";
+  notesEl.style.marginTop = "6px";
+  notesEl.textContent = notes ? `📝 ${notes}` : "";
 
-      card.addEventListener("click", () => showWorkoutDetail(w.id));
-      host.appendChild(card);
-    });
-  } catch (err) {
-    console.error(err);
-    host.innerHTML = `<div class="muted">Error loading history: ${String(err.message || err)}</div>`;
-  }
+  left.append(title, dateEl);
+  if (ratingEl.innerHTML) left.appendChild(ratingEl);
+  if (notes) left.appendChild(notesEl);
+
+  const actions = document.createElement("div");
+  actions.className = "row";
+  actions.style.gap = "8px";
+
+  const del = document.createElement("button");
+  del.className = "secondary";
+  del.textContent = "Delete workout";
+  del.onclick = async () => {
+    const ok = confirm("Delete this workout from history? This cannot be undone.");
+    if (!ok) return;
+
+    try {
+      await deleteWorkoutCascade(workoutId);
+      detail.classList.add("hidden");
+      list.classList.remove("hidden");
+      detail.innerHTML = "";
+      await refreshHistory();
+    } catch (e) {
+      console.error(e);
+      alert(`Failed to delete workout: ${String(e.message || e)}`);
+    }
+  };
+
+  const back = document.createElement("button");
+  back.className = "secondary";
+  back.textContent = "Back";
+  back.onclick = () => {
+    detail.classList.add("hidden");
+    list.classList.remove("hidden");
+    detail.innerHTML = "";
+  };
+
+  actions.append(del, back);
+
+  header.append(left, actions);
+  wrap.appendChild(header);
+
+  // --- Exercises list ---
+  (w.workout_exercises || []).forEach((we, i) => {
+    const ex = document.createElement("div");
+    ex.className = "item";
+
+    const name = we.exercises?.name || "Exercise";
+    const sets = we.sets || [];
+
+    ex.innerHTML = `
+      <div><b>${i + 1}. ${escapeHtml(name)}</b></div>
+      <div class="small">
+        ${
+          sets.length
+            ? sets
+                .map((s, idx) => `Set ${idx + 1}: ${escapeHtml(fmtSet(s))}`)
+                .join("<br/>")
+            : "No sets saved"
+        }
+      </div>
+    `;
+
+    wrap.appendChild(ex);
+  });
+
+  detail.innerHTML = "";
+  detail.appendChild(wrap);
 }
 $("historyFilter")?.addEventListener("change", refreshHistory);
 const menuToggle = document.getElementById("menuToggle");
