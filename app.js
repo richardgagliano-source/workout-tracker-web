@@ -1224,7 +1224,107 @@ addSet.textContent = "+ set";
   // deterministic order by order_index (or fallback)
   const ordered = [...items].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
-  
+  function promptWorkoutFeedback() {
+  return new Promise((resolve) => {
+    // overlay
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(0,0,0,0.55)";
+    overlay.style.backdropFilter = "blur(6px)";
+    overlay.style.zIndex = "9999";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.padding = "16px";
+
+    // modal
+    const modal = document.createElement("div");
+    modal.className = "item";
+    modal.style.maxWidth = "520px";
+    modal.style.width = "100%";
+
+    const title = document.createElement("h3");
+    title.textContent = "Rate the difficulty of this workout";
+
+    const sub = document.createElement("div");
+    sub.className = "small muted";
+    sub.textContent = "1 = very easy, 10 = brutal";
+
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.alignItems = "center";
+    row.style.justifyContent = "space-between";
+    row.style.gap = "12px";
+    row.style.marginTop = "10px";
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "1";
+    slider.max = "10";
+    slider.step = "1";
+    slider.value = "7";
+    slider.style.width = "100%";
+
+    const val = document.createElement("div");
+    val.style.minWidth = "36px";
+    val.style.textAlign = "right";
+    val.style.fontWeight = "700";
+    val.textContent = slider.value;
+
+    slider.oninput = () => (val.textContent = slider.value);
+
+    row.append(slider, val);
+
+    const notesLabel = document.createElement("div");
+    notesLabel.className = "small muted";
+    notesLabel.style.marginTop = "12px";
+    notesLabel.textContent = "Notes about this workout";
+
+    const notes = document.createElement("textarea");
+    notes.placeholder = "e.g. slept 4 hrs, felt strong on squats, shoulder a little tight…";
+    notes.rows = 4;
+    notes.style.width = "100%";
+    notes.style.marginTop = "6px";
+
+    const actions = document.createElement("div");
+    actions.className = "row";
+    actions.style.justifyContent = "flex-end";
+    actions.style.gap = "10px";
+    actions.style.marginTop = "12px";
+
+    const skip = document.createElement("button");
+    skip.className = "secondary";
+    skip.textContent = "Skip";
+
+    const save = document.createElement("button");
+    save.textContent = "Save rating";
+
+    function cleanup(result) {
+      overlay.remove();
+      resolve(result);
+    }
+
+    skip.onclick = () => cleanup(null);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) cleanup(null);
+    };
+    save.onclick = () =>
+      cleanup({
+        difficulty_rating: Number(slider.value),
+        workout_notes: notes.value.trim() || null,
+      });
+
+    actions.append(skip, save);
+
+    modal.append(title, sub, row, notesLabel, notes, actions);
+    overlay.append(modal);
+    document.body.append(overlay);
+
+    // focus notes for convenience
+    setTimeout(() => notes.focus(), 0);
+  });
+}
   // DEBUG: show group ids on mobile
 
   for (const it of ordered) {
@@ -1768,7 +1868,15 @@ $("saveWorkoutBtn").addEventListener("click", async () => {
     }
 
     await insertSets(rows);
-
+// ✅ After saving sets, ask for difficulty + notes, then store on workout
+const feedback = await promptWorkoutFeedback();
+if (feedback && activeWorkout?.workoutId) {
+  await fetchJSON(`/rest/v1/workouts?id=eq.${activeWorkout.workoutId}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: feedback, // { difficulty_rating, workout_notes }
+  });
+}
     // PR detection (best-effort; don’t block save UX)
     let prMsg = "";
     try {
