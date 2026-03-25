@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-02-27-G");
+console.log("APP VERSION: 2026-03-24-A");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -1309,10 +1309,17 @@ del.textContent = "− set";
     const addSet = document.createElement("button");
 addSet.className = "btn-set-add";
 addSet.textContent = "+ set";
-    addSet.onclick = () => {
-      item.sets.push({ set_index: item.sets.length, weight: "", reps: "" });
-      renderSetsUI(item, setsBox);
-    };
+addSet.onclick = () => {
+  const prev = item.sets[item.sets.length - 1] || { weight: "", reps: "" };
+
+  item.sets.push({
+    set_index: item.sets.length,
+    weight: prev.weight ?? "",
+    reps: prev.reps ?? "",
+  });
+
+  renderSetsUI(item, setsBox);
+};
     return addSet;
   }
 
