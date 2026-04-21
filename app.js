@@ -1,4 +1,4 @@
-console.log("APP VERSION: 2026-04-20-A");
+console.log("APP VERSION: 2026-03-24-A");
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // --- Supabase config (your project) ---
@@ -759,26 +759,7 @@ async function createTemplate(userId, name, split_type) {
 function refreshStartWorkoutDropdown() {
   const sel = $("startTplSelect");
   sel.innerHTML = "";
-  const templates = (cachedTemplates || []).slice().sort((a, b) => {
-  function parse(t) {
-    const name = (t.name || "").toLowerCase();
-
-    const dayMatch = name.match(/day\s*(\d+)/);
-    const day = dayMatch ? parseInt(dayMatch[1], 10) : 999;
-
-    let typeOrder = 999;
-    if (name.includes("push")) typeOrder = 0;
-    else if (name.includes("pull")) typeOrder = 1;
-
-    return { day, typeOrder };
-  }
-
-  const A = parse(a);
-  const B = parse(b);
-
-  if (A.day !== B.day) return A.day - B.day;
-  return A.typeOrder - B.typeOrder;
-});
+  const templates = (cachedTemplates || []);
   if (!templates.length) {
     const opt = document.createElement("option");
     opt.value = "";
